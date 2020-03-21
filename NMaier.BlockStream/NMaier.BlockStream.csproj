@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.1;net48</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <Deterministic>True</Deterministic>
+    <LangVersion>8</LangVersion>
+
+    <Authors>Nils Maier</Authors>
+    <Company />
+    <Product />
+    <Description>Streams that wrap streams, to write blocks, that can be transparently transformed!</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Version>1.6.0</Version>
+
+    <IncludeSymbols>true</IncludeSymbols>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JetBrains.Annotations" Version="2020.1.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="K4os.Compression.LZ4" Version="1.1.11" />
+  </ItemGroup>
+
+</Project>
