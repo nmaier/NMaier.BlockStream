@@ -3,10 +3,8 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using JetBrains.Annotations;
-
 #if NET48
 using System.Buffers;
-
 #endif
 
 namespace NMaier.BlockStream
