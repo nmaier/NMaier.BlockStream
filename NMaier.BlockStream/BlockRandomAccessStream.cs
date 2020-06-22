@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 using static System.Buffers.Binary.BinaryPrimitives;
 
@@ -39,9 +40,28 @@ namespace NMaier.BlockStream
       set => Seek(value, SeekOrigin.Begin);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override void Flush()
     {
+      Flush(false);
+    }
+
+    public void Flush(bool flushToDisk)
+    {
       if (!blockDirty) {
+        if (!flushToDisk) {
+          return;
+        }
+
+        switch (WrappedStream) {
+          case FileStream fs:
+            fs.Flush(true);
+            break;
+          default:
+            WrappedStream.Flush();
+            break;
+        }
+
         return;
       }
 
@@ -95,19 +115,16 @@ namespace NMaier.BlockStream
         throw new IOException("Corrupt currentIndex");
       }
 
-      MakeClean();
+      MakeClean(flushToDisk);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override int Read(byte[] buffer, int offset, int count)
     {
       return Read(buffer.AsSpan(offset, count));
     }
 
-#if NET48
-    public int Read(Span<byte> buffer)
-#else
     public override int Read(Span<byte> buffer)
-#endif
     {
       var read = 0;
       for (;;) {
@@ -182,7 +199,7 @@ namespace NMaier.BlockStream
         CurrentLength = CurrentFooterLength = 0;
         CurrentPosition = 0;
         WriteFooter();
-        MakeClean();
+        MakeClean(false);
         return;
       }
 
@@ -210,7 +227,7 @@ namespace NMaier.BlockStream
 
       CurrentLength = value;
       WriteFooter();
-      MakeClean();
+      MakeClean(false);
     }
 
     public override void Write(byte[] buffer, int offset, int count)
@@ -265,7 +282,7 @@ namespace NMaier.BlockStream
       base.Dispose(disposing);
     }
 
-    private bool FillBlock(in long block)
+    internal bool FillBlock(in long block)
     {
       if (currentIndex == block) {
         return true;
@@ -307,19 +324,27 @@ namespace NMaier.BlockStream
       return true;
     }
 
-    private void MakeClean()
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MakeClean(bool flushToDisk)
     {
       currentBlock.AsSpan(0, BlockSize).Clear();
       currentIndex = -1;
       blockDirty = false;
-      WrappedStream.Flush();
+      switch (WrappedStream) {
+        case FileStream fs:
+          fs.Flush(flushToDisk);
+          break;
+        default:
+          WrappedStream.Flush();
+          break;
+      }
     }
 
     private void ReadIndex()
     {
       if (WrappedStream.Length == 0) {
         WriteFooter();
-        MakeClean();
+        MakeClean(false);
         return;
       }
 
@@ -347,7 +372,7 @@ namespace NMaier.BlockStream
         footer = footer.Slice(sizeof(long) + sizeof(short));
       }
 
-      MakeClean();
+      MakeClean(false);
     }
   }
 }

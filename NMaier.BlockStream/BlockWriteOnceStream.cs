@@ -9,6 +9,7 @@ namespace NMaier.BlockStream
   {
     private readonly byte[] currentBlock;
     private int fill;
+    private bool fullyFlushToDisk;
 
     public BlockWriteOnceStream(Stream wrappedStream) : this(wrappedStream, new NoneBlockTransformer())
     {
@@ -37,7 +38,17 @@ namespace NMaier.BlockStream
     {
     }
 
+    public void Flush(bool flushToDisk)
+    {
+      fullyFlushToDisk |= flushToDisk;
+    }
+
     public override int Read(byte[] buffer, int offset, int count)
+    {
+      throw new NotSupportedException();
+    }
+
+    public override int Read(Span<byte> buffer)
     {
       throw new NotSupportedException();
     }
@@ -116,6 +127,9 @@ namespace NMaier.BlockStream
       }
 
       WriteFooter();
+      if (fullyFlushToDisk && WrappedStream is FileStream fs) {
+        fs.Flush(true);
+      }
       base.Dispose(disposing);
     }
 

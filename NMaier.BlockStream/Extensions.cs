@@ -3,9 +3,6 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using JetBrains.Annotations;
-#if NET48
-using System.Buffers;
-#endif
 
 namespace NMaier.BlockStream
 {
@@ -79,13 +76,13 @@ namespace NMaier.BlockStream
     {
       length = length <= 0 ? buffer.Length : length;
 #if NET48
-      var temp = ArrayPool<byte>.Shared.Rent(length);
+      var temp = System.Buffers.ArrayPool<byte>.Shared.Rent(length);
       try {
         ReadFullBlock(stream, temp, 0, length);
         temp.AsSpan(0, length).CopyTo(buffer);
       }
       finally {
-        ArrayPool<byte>.Shared.Return(temp);
+        System.Buffers.ArrayPool<byte>.Shared.Return(temp);
       }
 #else
       var remaining = length;

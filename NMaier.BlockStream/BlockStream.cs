@@ -8,10 +8,10 @@ using JetBrains.Annotations;
 namespace NMaier.BlockStream
 {
   [PublicAPI]
-  public abstract class BlockStream : Stream
+  public abstract class BlockStream : ReaderEnhancedStream
   {
     public const short BLOCK_SIZE = 16384;
-    protected readonly short BlockSize;
+    protected internal readonly short BlockSize;
     protected readonly IBlockCache? Cache;
     protected readonly Dictionary<long, Extent> Extents = new Dictionary<long, Extent>();
     protected readonly IBlockTransformer Transformer;

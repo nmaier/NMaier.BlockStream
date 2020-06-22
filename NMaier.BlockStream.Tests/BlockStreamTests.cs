@@ -32,8 +32,10 @@ namespace NMaier.BlockStream.Tests
       using (var writer = new BlockReadOnlyStream(ms, transformer, cache: cache)) {
         Assert.AreEqual(expectedLength, writer.Length);
         using var binaryReader = new BinaryReader(writer, Encoding.ASCII, true);
+        using var binaryCursorReader = new BinaryReader(writer.CreateCursor(), Encoding.ASCII, true);
         for (var i = 0; i < COUNT; ++i) {
           Assert.AreEqual(i, binaryReader.ReadInt32());
+          Assert.AreEqual(i, binaryCursorReader.ReadInt32());
         }
 
         var buf = new byte[1 << 22];
@@ -116,6 +118,13 @@ namespace NMaier.BlockStream.Tests
         writer.SetLength(0);
         Assert.AreEqual(writer.Length, 0);
         Assert.AreEqual(writer.Position, 0);
+
+
+
+
+
+
+        writer.Flush(true);
       }
     }
 
