@@ -49,6 +49,32 @@ namespace NMaier.BlockStream.Tests
     {
       BlockStreamWriterSizeTestRunner(transformer, null);
       BlockStreamWriterSizeTestRunner(transformer, new BlockCache());
+      BlockStreamSequentialTestRunner(transformer);
+    }
+
+    private static void BlockStreamSequentialTestRunner(IBlockTransformer transformer)
+    {
+      var buf = new byte[1 << 20];
+      var outbuf = new byte[1 << 20];
+      buf.AsSpan().Fill(0x03);
+      using var ms = new KeepOpenMemoryStream();
+      using (var writer = new SequentialBlockWriteOnceStream(ms, transformer)) {
+        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
+          buf[i] = (byte)(i % byte.MaxValue);
+          writer.Write(buf.AsSpan(0, i));
+          writer.Flush(true);
+        }
+      }
+
+      ms.Seek(0, SeekOrigin.Begin);
+      using (var reader = new SequentialBlockReadonlyStream(ms, transformer)) {
+        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
+          outbuf.AsSpan(0, i).Clear();
+          var read = reader.Read(outbuf.AsSpan(0, i));
+          Assert.AreEqual(i, read);
+          Assert.IsTrue(buf.AsSpan(0, i).SequenceEqual(outbuf.AsSpan(0, i)));
+        }
+      }
     }
 
     private static void BlockStreamWriterSizeTestRunner(IBlockTransformer transformer, [CanBeNull] IBlockCache cache)
@@ -118,11 +144,6 @@ namespace NMaier.BlockStream.Tests
         writer.SetLength(0);
         Assert.AreEqual(writer.Length, 0);
         Assert.AreEqual(writer.Position, 0);
-
-
-
-
-
 
         writer.Flush(true);
       }
