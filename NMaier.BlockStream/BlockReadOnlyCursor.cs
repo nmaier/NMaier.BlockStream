@@ -17,14 +17,20 @@ namespace NMaier.BlockStream
       this.stream = stream;
     }
 
-    protected override void Dispose(bool disposing)
-    {
-      if (currentBlock.Length > 0) {
-        ArrayPool<byte>.Shared.Return(currentBlock);
-        currentBlock = Array.Empty<byte>();
-      }
+    public override bool CanRead => true;
 
-      base.Dispose(disposing);
+    public override bool CanSeek => true;
+
+    public override bool CanWrite => false;
+
+    public override long Length => stream.Length;
+
+    public override long Position
+    {
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
+      get => currentPosition;
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
+      set => Seek(value, SeekOrigin.Begin);
     }
 
     public override void Flush()
@@ -40,7 +46,7 @@ namespace NMaier.BlockStream
     public override int Read(Span<byte> buffer)
     {
       var read = 0;
-      for (; ; ) {
+      for (;;) {
         var block = currentPosition / stream.BlockSize;
         if (currentIndex != block) {
           if (!stream.FillBlock(block, currentBlock, ref currentIndex)) {
@@ -115,20 +121,14 @@ namespace NMaier.BlockStream
     }
 #endif
 
-    public override bool CanRead => true;
-
-    public override bool CanSeek => true;
-
-    public override bool CanWrite => false;
-
-    public override long Length => stream.Length;
-
-    public override long Position
+    protected override void Dispose(bool disposing)
     {
-      [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      get => currentPosition;
-      [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      set => Seek(value, SeekOrigin.Begin);
+      if (currentBlock.Length > 0) {
+        ArrayPool<byte>.Shared.Return(currentBlock);
+        currentBlock = Array.Empty<byte>();
+      }
+
+      base.Dispose(disposing);
     }
   }
 }

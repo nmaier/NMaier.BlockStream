@@ -8,11 +8,17 @@ using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
 {
+  /// <summary>
+  ///   A general reader block stream.
+  /// </summary>
+  /// <remarks>
+  ///   Compatible with output from <see cref="BlockRandomAccessStream" /> and <see cref="BlockWriteOnceStream" />
+  /// </remarks>
   [PublicAPI]
   public sealed class BlockReadOnlyStream : BlockStream
   {
-    private readonly MemoryMappedFile? mmap;
     private readonly ReaderEnhancedStream cursor;
+    private readonly MemoryMappedFile? mmap;
 
     public BlockReadOnlyStream(Stream wrappedStream, IBlockCache? cache = null)
       : this(wrappedStream, new NoneBlockTransformer(), cache: cache)
@@ -45,6 +51,12 @@ namespace NMaier.BlockStream
       get => cursor.Position;
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
       set => cursor.Position = value;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReaderEnhancedStream CreateCursor()
+    {
+      return new BlockReadOnlyCursor(this);
     }
 
     public override void Flush()
@@ -145,12 +157,6 @@ namespace NMaier.BlockStream
 
       currentIndex = block;
       return true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ReaderEnhancedStream CreateCursor()
-    {
-      return new BlockReadOnlyCursor(this);
     }
 
     private void ReadIndex()

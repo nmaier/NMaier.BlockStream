@@ -7,6 +7,12 @@ using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace NMaier.BlockStream
 {
+  /// <summary>
+  ///   A general readwrite block stream.
+  /// </summary>
+  /// <remarks>
+  ///   Compatible with output from <see cref="BlockRandomAccessStream" /> and <see cref="BlockWriteOnceStream" />
+  /// </remarks>
   [PublicAPI]
   public sealed class BlockRandomAccessStream : BlockStream
   {
@@ -15,11 +21,50 @@ namespace NMaier.BlockStream
     private bool blockDirty;
     private long currentIndex = -1;
 
-    public BlockRandomAccessStream(Stream wrappedStream, IBlockCache? cache = null)
-      : this(wrappedStream, new NoneBlockTransformer(), cache: cache)
+    /// <summary>
+    ///   Wraps a generic read+write stream.
+    /// </summary>
+    /// <remarks>
+    ///   <list type="bullet">
+    ///     <item>
+    ///       <description>All wrapped streams must be seekable</description>
+    ///     </item>
+    ///     <item>
+    ///       <description>
+    ///         You should prefer <see cref="BlockReadOnlyStream" />/<see cref="BlockWriteOnceStream" /> or the
+    ///         sequential versions when possible.
+    ///       </description>
+    ///     </item>
+    ///   </list>
+    /// </remarks>
+    /// <param name="wrappedStream">Stream to be wrapped</param>
+    /// <param name="blockSize">Block size to use</param>
+    /// <param name="cache">Optional block cache</param>
+    public BlockRandomAccessStream(Stream wrappedStream, short blockSize = BLOCK_SIZE, IBlockCache? cache = null)
+      : this(wrappedStream, new NoneBlockTransformer(), blockSize, cache)
     {
     }
 
+    /// <summary>
+    ///   Wraps a generic read+write stream.
+    /// </summary>
+    /// <remarks>
+    ///   <list type="bullet">
+    ///     <item>
+    ///       <description>All wrapped streams must be seekable</description>
+    ///     </item>
+    ///     <item>
+    ///       <description>
+    ///         You should prefer <see cref="BlockReadOnlyStream" />/<see cref="BlockWriteOnceStream" /> or the
+    ///         sequential versions when possible.
+    ///       </description>
+    ///     </item>
+    ///   </list>
+    /// </remarks>
+    /// <param name="wrappedStream">Stream to be wrapped</param>
+    /// <param name="transformer">Block transformer to use</param>
+    /// <param name="blockSize">Block size to use</param>
+    /// <param name="cache">Optional block cache</param>
     public BlockRandomAccessStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE,
       IBlockCache? cache = null)
       : base(wrappedStream, transformer, blockSize, cache)
@@ -46,6 +91,10 @@ namespace NMaier.BlockStream
       Flush(false);
     }
 
+    /// <summary>
+    ///   Like <see cref="Flush()" />, but allows to force a disk flush if the underlying stream is a <see cref="FileStream" />
+    /// </summary>
+    /// <param name="flushToDisk">Force a full disk flush</param>
     public void Flush(bool flushToDisk)
     {
       if (!blockDirty) {
@@ -236,6 +285,10 @@ namespace NMaier.BlockStream
     }
 
 #if NET48
+    /// <summary>
+    ///   See <see cref="Write(byte[],int,int)" />
+    /// </summary>
+    /// <param name="buffer">Target buffer</param>
     public void Write(ReadOnlySpan<byte> buffer)
 #else
     public override void Write(ReadOnlySpan<byte> buffer)

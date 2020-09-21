@@ -12,6 +12,9 @@ namespace NMaier.BlockStream
     /// <summary>
     ///   Read the full block from a stream, or throw an IOException if not en9ough data to fill the block is available
     /// </summary>
+    /// <exception cref="EndOfStreamException">Stream does not contain enough data to fulfill the request.</exception>
+    /// <exception cref="ArgumentException">Requested length larger than buffer</exception>
+    /// <exception cref="IOException">Any exceptions the stream may raise</exception>
     /// <param name="stream">Stream to read from</param>
     /// <param name="buffer">Target buffer</param>
     /// <param name="length">Length to read. If this value is less than 0, then the length of the buffer will be used</param>
@@ -24,18 +27,25 @@ namespace NMaier.BlockStream
     /// <summary>
     ///   Read the full block from a stream, or throw an IOException if not en9ough data to fill the block is available
     /// </summary>
+    /// <exception cref="EndOfStreamException">Stream does not contain enough data to fulfill the request.</exception>
+    /// <exception cref="ArgumentException">Requested length larger than buffer</exception>
+    /// <exception cref="IOException">Any exceptions the stream may raise</exception>
     /// <param name="stream">Stream to read from</param>
     /// <param name="buffer">Target buffer</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ReadFullBlock(this Stream stream, ArraySegment<byte> buffer)
     {
-      ReadFullBlock(stream, buffer.Array, buffer.Offset, buffer.Count);
+      ReadFullBlock(stream, buffer.Array ?? throw new ArgumentException("Invalid segment", nameof(buffer)),
+                    buffer.Offset, buffer.Count);
     }
 
 
     /// <summary>
     ///   Read the full block from a stream, or throw an IOException if not en9ough data to fill the block is available
     /// </summary>
+    /// <exception cref="EndOfStreamException">Stream does not contain enough data to fulfill the request.</exception>
+    /// <exception cref="ArgumentException">Requested length larger than buffer</exception>
+    /// <exception cref="IOException">Any exceptions the stream may raise</exception>
     /// <param name="stream">Stream to read from</param>
     /// <param name="buffer">Target buffer</param>
     /// <param name="offset">Offset in the target buffer</param>
@@ -62,13 +72,22 @@ namespace NMaier.BlockStream
         }
 
         if (read == 0) {
-          throw new IOException("Truncated read");
+          throw new EndOfStreamException("Truncated read");
         }
 
         remaining -= read;
       }
     }
 
+    /// <summary>
+    ///   Reads a full block into the target.
+    /// </summary>
+    /// <exception cref="EndOfStreamException">Stream does not contain enough data to fulfill the request.</exception>
+    /// <exception cref="ArgumentException">Requested length larger than buffer</exception>
+    /// <exception cref="IOException">Any exceptions the stream may raise</exception>
+    /// <param name="stream">Stream to read from</param>
+    /// <param name="buffer">Target buffer</param>
+    /// <param name="length">Optional length; defaults to full length of the buffer</param>
 #if NET48
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
@@ -97,7 +116,7 @@ namespace NMaier.BlockStream
         }
 
         if (read == 0) {
-          throw new IOException("Truncated read");
+          throw new EndOfStreamException("Truncated read");
         }
 
         remaining -= read;
@@ -109,7 +128,7 @@ namespace NMaier.BlockStream
     internal static byte[] DeriveKeyBytesReasonablySafeNotForStorage(this byte[] passphrase, int length)
     {
       // This is essentially OK. We never store the pass phrase or the derived key ourselves.
-      // This will still allow an to try pass phrases fast-ish, if that's what he's after.
+      // This will still allow an attacker to brute-force pass phrases fast-ish, if that's what he's after.
       using var der =
         new Rfc2898DeriveBytes(passphrase, new byte[] { 0xf9, 0x03, 0x02, 0xea, 0x42, 0x23, 0xab, 0xff }, 100);
       return der.GetBytes(length);

@@ -9,6 +9,9 @@ using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
 {
+  /// <summary>
+  ///   Transforms data using ChaCha20 and verifies data using a Poly1305 MAC.
+  /// </summary>
   [PublicAPI]
   public sealed class ChaChaAndPolyTransformer : IBlockTransformer
   {
@@ -43,10 +46,26 @@ namespace NMaier.BlockStream
     private readonly uint polys2;
     private readonly uint polys3;
 
+    /// <summary>
+    ///   Create a new transformer given the specified key.
+    /// </summary>
+    /// <remarks>
+    ///   The key is not used verbatim, but used as input into a KDF deriving the actual keys for ChaCha20 and Poly1305
+    ///   MAC
+    /// </remarks>
+    /// <param name="key">Key to use</param>
     public ChaChaAndPolyTransformer(string key) : this(Encoding.UTF8.GetBytes(key))
     {
     }
 
+    /// <summary>
+    ///   Create a new transformer given the specified key.
+    /// </summary>
+    /// <remarks>
+    ///   The key is not used verbatim, but used as input into a KDF deriving the actual keys for ChaCha20 and Poly1305
+    ///   MAC
+    /// </remarks>
+    /// <param name="key">Key to use</param>
     public ChaChaAndPolyTransformer(byte[] key)
     {
       // This is essentially OK. We never store the pass phrase or the derived key ourselves.
@@ -82,8 +101,10 @@ namespace NMaier.BlockStream
       polys3 = (uint)(tagKey[28] | (tagKey[29] << 8) | (tagKey[30] << 16) | (tagKey[31] << 24));
     }
 
+    /// <inheritdoc />
     public bool MayChangeSize => true;
 
+    /// <inheritdoc />
     public ReadOnlySpan<byte> TransformBlock(ReadOnlySpan<byte> block)
     {
       var rv = new byte[NONCE_LENGTH + TAG_LENGTH + block.Length];
@@ -94,6 +115,7 @@ namespace NMaier.BlockStream
       return rv;
     }
 
+    /// <inheritdoc />
     public int UntransformBlock(ReadOnlySpan<byte> input, Span<byte> block)
     {
       var overlaps = input.Overlaps(block);

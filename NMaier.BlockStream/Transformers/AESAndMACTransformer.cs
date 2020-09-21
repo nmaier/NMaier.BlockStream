@@ -1,30 +1,46 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
 {
+  /// <summary>
+  ///   Transforms data using AES-CTR and verifies data using a HMAC-SHA256.
+  /// </summary>
   [PublicAPI]
   public sealed class AESAndMACTransformer : IBlockTransformer
   {
     private readonly byte[] cryptoKey;
     private readonly byte[] macKey;
 
+    /// <summary>
+    ///   Create a new transformer given the specified key.
+    /// </summary>
+    /// <remarks>The key is not used verbatim, but used as input into a KDF deriving the actual keys for AES and MAC</remarks>
+    /// <param name="key">Key to use</param>
     public AESAndMACTransformer(string key) : this(Encoding.UTF8.GetBytes(key))
     {
     }
 
+    /// <summary>
+    ///   Create a new transformer given the specified key.
+    /// </summary>
+    /// <remarks>The key is not used verbatim, but used as input into a KDF deriving the actual keys for AES and MAC</remarks>
+    /// <param name="key">Key to use</param>
     public AESAndMACTransformer(byte[] key)
     {
       cryptoKey = key.DeriveKeyBytesReasonablySafeNotForStorage(24);
-      macKey = key.DeriveKeyBytesReasonablySafeNotForStorage(64);
+      macKey = key.Concat(cryptoKey).ToArray().DeriveKeyBytesReasonablySafeNotForStorage(64);
     }
 
+    /// <inheritdoc />
     public bool MayChangeSize => true;
 
+    /// <inheritdoc />
     public ReadOnlySpan<byte> TransformBlock(ReadOnlySpan<byte> block)
     {
       using var hmac = new HMACSHA256(macKey);
@@ -39,6 +55,7 @@ namespace NMaier.BlockStream
       return rv;
     }
 
+    /// <inheritdoc />
     public int UntransformBlock(ReadOnlySpan<byte> input, Span<byte> block)
     {
       using var hmac = new HMACSHA256(macKey);
@@ -65,12 +82,12 @@ namespace NMaier.BlockStream
         aes = new AesManaged { BlockSize = 128, Mode = CipherMode.ECB, Padding = PaddingMode.None, KeySize = 192 };
       }
 
-      public override ICryptoTransform CreateDecryptor(byte[] rgbKey, byte[] _)
+      public override ICryptoTransform CreateDecryptor(byte[] rgbKey, byte[]? _)
       {
         return new CounterModeCryptoTransform(aes, rgbKey, counter);
       }
 
-      public override ICryptoTransform CreateEncryptor(byte[] rgbKey, byte[] _)
+      public override ICryptoTransform CreateEncryptor(byte[] rgbKey, byte[]? _)
       {
         return new CounterModeCryptoTransform(aes, rgbKey, counter);
       }

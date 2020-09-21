@@ -6,6 +6,9 @@ using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
 {
+  /// <summary>
+  ///   Transforms data, adding a simple checksum for some integrity checking
+  /// </summary>
   [PublicAPI]
   public sealed class ChecksumTransformer : IBlockTransformer
   {
@@ -46,8 +49,10 @@ namespace NMaier.BlockStream
       return rv;
     }
 
+    /// <inheritdoc />
     public bool MayChangeSize => true;
 
+    /// <inheritdoc />
     public ReadOnlySpan<byte> TransformBlock(ReadOnlySpan<byte> block)
     {
       var rv = new byte[block.Length + sizeof(ulong)];
@@ -57,6 +62,7 @@ namespace NMaier.BlockStream
       return rv;
     }
 
+    /// <inheritdoc />
     public int UntransformBlock(ReadOnlySpan<byte> input, Span<byte> block)
     {
       var sum = BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(input.Length - sizeof(ulong)));

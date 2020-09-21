@@ -4,6 +4,12 @@ using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
 {
+  /// <summary>
+  ///   A general writer block stream. More efficient in compute and I/O than <see cref="BlockRandomAccessStream" />.
+  /// </summary>
+  /// <remarks>
+  ///   Produces output compatible with <see cref="BlockRandomAccessStream" /> and <see cref="BlockReadOnlyStream" />
+  /// </remarks>
   [PublicAPI]
   public sealed class BlockWriteOnceStream : BlockStream
   {
@@ -11,10 +17,24 @@ namespace NMaier.BlockStream
     private int fill;
     private bool fullyFlushToDisk;
 
-    public BlockWriteOnceStream(Stream wrappedStream) : this(wrappedStream, new NoneBlockTransformer())
+    /// <summary>
+    ///   Wraps a generic stream into a block stream using the <see cref="NoneBlockTransformer" />.
+    /// </summary>
+    /// <remarks>The wrapped stream must be writable and seekable</remarks>
+    /// <param name="wrappedStream">Stream to wrap</param>
+    /// <param name="blockSize">Block size to use</param>
+    public BlockWriteOnceStream(Stream wrappedStream, short blockSize = BLOCK_SIZE) : this(
+      wrappedStream, new NoneBlockTransformer(), blockSize)
     {
     }
 
+    /// <summary>
+    ///   Wraps a generic stream into a block stream using the specified transformer and blocksize.
+    /// </summary>
+    /// <remarks>The wrapped stream must be writable and seekable</remarks>
+    /// <param name="wrappedStream">Stream to wrap</param>
+    /// <param name="transformer">The block transformer to use</param>
+    /// <param name="blockSize">Block size to use</param>
     public BlockWriteOnceStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE)
       : base(wrappedStream, transformer, blockSize)
     {
@@ -38,6 +58,11 @@ namespace NMaier.BlockStream
     {
     }
 
+    /// <summary>
+    ///   Like <see cref="Flush()" />, but allows to force a full disk flush (if the underlying stream is a
+    ///   <see cref="FileStream" />
+    /// </summary>
+    /// <param name="flushToDisk">Force a disk flush</param>
     public void Flush(bool flushToDisk)
     {
       fullyFlushToDisk |= flushToDisk;
@@ -63,6 +88,10 @@ namespace NMaier.BlockStream
       throw new NotSupportedException();
     }
 
+    /// <summary>
+    ///   Skips to the next block, closing the current one.
+    ///   May be used to avoid some internal fragmentation.
+    /// </summary>
     public void SkipToNextBlock()
     {
       if (fill == 0) {
@@ -81,6 +110,10 @@ namespace NMaier.BlockStream
     }
 
 #if NET48
+    /// <summary>
+    /// See <see cref="Write(byte[],int,int)"/>
+    /// </summary>
+    /// <param name="buffer"></param>
     public void Write(ReadOnlySpan<byte> buffer)
 #else
     public override void Write(ReadOnlySpan<byte> buffer)
@@ -130,6 +163,7 @@ namespace NMaier.BlockStream
       if (fullyFlushToDisk && WrappedStream is FileStream fs) {
         fs.Flush(true);
       }
+
       base.Dispose(disposing);
     }
 
@@ -137,7 +171,7 @@ namespace NMaier.BlockStream
     {
       var transformed = Transformer.TransformBlock(block);
       if (transformed.Length > short.MaxValue) {
-        throw new IOException("Transformed block to large");
+        throw new IOException("Transformed block too large");
       }
 
       Extents[Extents.Count] = new Extent(WrappedStream.Position, (short)transformed.Length);
