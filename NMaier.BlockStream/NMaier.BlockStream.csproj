@@ -11,7 +11,7 @@
     <Product />
     <Description>Streams that wrap streams, to write blocks, that can be transparently transformed!</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>1.7.4</Version>
+    <Version>1.7.6</Version>
 
     <IncludeSymbols>true</IncludeSymbols>
     <DebugType>full</DebugType>
@@ -22,7 +22,7 @@
     <PackageReference Include="JetBrains.Annotations" Version="2020.1.0">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="K4os.Compression.LZ4" Version="1.1.11" />
+    <PackageReference Include="K4os.Compression.LZ4" Version="1.2.6" />
   </ItemGroup>
 
 </Project>
