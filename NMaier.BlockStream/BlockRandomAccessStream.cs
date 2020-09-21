@@ -40,8 +40,8 @@ namespace NMaier.BlockStream
     /// <param name="wrappedStream">Stream to be wrapped</param>
     /// <param name="blockSize">Block size to use</param>
     /// <param name="cache">Optional block cache</param>
-    public BlockRandomAccessStream(Stream wrappedStream, short blockSize = BLOCK_SIZE, IBlockCache? cache = null)
-      : this(wrappedStream, new NoneBlockTransformer(), blockSize, cache)
+    public BlockRandomAccessStream(Stream wrappedStream, short blockSize = BLOCK_SIZE, IBlockCache? cache = null) :
+      this(wrappedStream, new NoneBlockTransformer(), blockSize, cache)
     {
     }
 
@@ -66,8 +66,7 @@ namespace NMaier.BlockStream
     /// <param name="blockSize">Block size to use</param>
     /// <param name="cache">Optional block cache</param>
     public BlockRandomAccessStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE,
-      IBlockCache? cache = null)
-      : base(wrappedStream, transformer, blockSize, cache)
+      IBlockCache? cache = null) : base(wrappedStream, transformer, blockSize, cache)
     {
       ReadIndex();
     }
@@ -407,9 +406,7 @@ namespace NMaier.BlockStream
       var footerLength = ReadInt64LittleEndian(blen);
       CurrentFooterLength = CurrentLength = ReadInt64LittleEndian(blen.Slice(sizeof(long)));
       WrappedStream.Seek(-(sizeof(long) * 2) - footerLength, SeekOrigin.End);
-      var footer = footerLength < 4096
-        ? stackalloc byte[(int)footerLength]
-        : new byte[footerLength];
+      var footer = footerLength < 4096 ? stackalloc byte[(int)footerLength] : new byte[footerLength];
       WrappedStream.ReadFullBlock(footer);
       var block = 0L;
       while (footer.Length > 0) {

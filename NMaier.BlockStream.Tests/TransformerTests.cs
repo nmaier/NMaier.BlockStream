@@ -39,7 +39,7 @@ namespace NMaier.BlockStream.Tests
       Test(new NoneBlockTransformer());
     }
 
-    void Test(IBlockTransformer transformer)
+    private void Test(IBlockTransformer transformer)
     {
       var buffer = Enumerable.Range(0, 128).Select(v => (byte)v).ToArray();
       var cmp = Enumerable.Range(0, 128).Select(v => (byte)v).ToArray();

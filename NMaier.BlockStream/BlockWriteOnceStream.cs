@@ -35,8 +35,8 @@ namespace NMaier.BlockStream
     /// <param name="wrappedStream">Stream to wrap</param>
     /// <param name="transformer">The block transformer to use</param>
     /// <param name="blockSize">Block size to use</param>
-    public BlockWriteOnceStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE)
-      : base(wrappedStream, transformer, blockSize)
+    public BlockWriteOnceStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE) :
+      base(wrappedStream, transformer, blockSize)
     {
       currentBlock = new byte[BlockSize];
       WrappedStream.Seek(0, SeekOrigin.Begin);
@@ -51,7 +51,7 @@ namespace NMaier.BlockStream
     public override long Position
     {
       get => CurrentPosition;
-      set { throw new NotSupportedException(); }
+      set => throw new NotSupportedException();
     }
 
     public override void Flush()

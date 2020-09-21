@@ -20,14 +20,13 @@ namespace NMaier.BlockStream
     private readonly ReaderEnhancedStream cursor;
     private readonly MemoryMappedFile? mmap;
 
-    public BlockReadOnlyStream(Stream wrappedStream, IBlockCache? cache = null)
-      : this(wrappedStream, new NoneBlockTransformer(), cache: cache)
+    public BlockReadOnlyStream(Stream wrappedStream, IBlockCache? cache = null) : this(
+      wrappedStream, new NoneBlockTransformer(), cache: cache)
     {
     }
 
     public BlockReadOnlyStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE,
-      IBlockCache? cache = null)
-      : base(wrappedStream, transformer, blockSize, cache)
+      IBlockCache? cache = null) : base(wrappedStream, transformer, blockSize, cache)
     {
       ReadIndex();
       if (wrappedStream is FileStream fstream) {
@@ -171,9 +170,7 @@ namespace NMaier.BlockStream
       var footerLength = BinaryPrimitives.ReadInt64LittleEndian(blen);
       CurrentFooterLength = CurrentLength = BinaryPrimitives.ReadInt64LittleEndian(blen.Slice(sizeof(long)));
       WrappedStream.Seek(-(sizeof(long) * 2) - footerLength, SeekOrigin.End);
-      var footer = footerLength < 4096
-        ? stackalloc byte[(int)footerLength]
-        : new byte[footerLength];
+      var footer = footerLength < 4096 ? stackalloc byte[(int)footerLength] : new byte[footerLength];
       WrappedStream.ReadFullBlock(footer);
 
       var block = 0L;

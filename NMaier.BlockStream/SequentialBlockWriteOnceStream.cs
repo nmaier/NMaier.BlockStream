@@ -129,7 +129,7 @@ namespace NMaier.BlockStream
     {
       Flush();
       base.Dispose(disposing);
-      
+
       if (currentBlock.Length <= 0) {
         return;
       }

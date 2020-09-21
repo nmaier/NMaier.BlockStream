@@ -13,6 +13,31 @@ namespace NMaier.BlockStream.Tests
   [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
   public sealed class BlockStreamTests
   {
+    private static void BlockStreamSequentialTestRunner(IBlockTransformer transformer)
+    {
+      var buf = new byte[1 << 20];
+      var outbuf = new byte[1 << 20];
+      buf.AsSpan().Fill(0x03);
+      using var ms = new KeepOpenMemoryStream();
+      using (var writer = new SequentialBlockWriteOnceStream(ms, transformer)) {
+        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
+          buf[i] = (byte)(i % byte.MaxValue);
+          writer.Write(buf.AsSpan(0, i));
+          writer.Flush(true);
+        }
+      }
+
+      ms.Seek(0, SeekOrigin.Begin);
+      using (var reader = new SequentialBlockReadonlyStream(ms, transformer)) {
+        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
+          outbuf.AsSpan(0, i).Clear();
+          var read = reader.Read(outbuf.AsSpan(0, i));
+          Assert.AreEqual(i, read);
+          Assert.IsTrue(buf.AsSpan(0, i).SequenceEqual(outbuf.AsSpan(0, i)));
+        }
+      }
+    }
+
     private static void BlockStreamWriterOnceTest(IBlockTransformer transformer, IBlockCache cache)
     {
       using var ms = new KeepOpenMemoryStream();
@@ -50,31 +75,6 @@ namespace NMaier.BlockStream.Tests
       BlockStreamWriterSizeTestRunner(transformer, null);
       BlockStreamWriterSizeTestRunner(transformer, new BlockCache());
       BlockStreamSequentialTestRunner(transformer);
-    }
-
-    private static void BlockStreamSequentialTestRunner(IBlockTransformer transformer)
-    {
-      var buf = new byte[1 << 20];
-      var outbuf = new byte[1 << 20];
-      buf.AsSpan().Fill(0x03);
-      using var ms = new KeepOpenMemoryStream();
-      using (var writer = new SequentialBlockWriteOnceStream(ms, transformer)) {
-        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
-          buf[i] = (byte)(i % byte.MaxValue);
-          writer.Write(buf.AsSpan(0, i));
-          writer.Flush(true);
-        }
-      }
-
-      ms.Seek(0, SeekOrigin.Begin);
-      using (var reader = new SequentialBlockReadonlyStream(ms, transformer)) {
-        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
-          outbuf.AsSpan(0, i).Clear();
-          var read = reader.Read(outbuf.AsSpan(0, i));
-          Assert.AreEqual(i, read);
-          Assert.IsTrue(buf.AsSpan(0, i).SequenceEqual(outbuf.AsSpan(0, i)));
-        }
-      }
     }
 
     private static void BlockStreamWriterSizeTestRunner(IBlockTransformer transformer, [CanBeNull] IBlockCache cache)
@@ -177,17 +177,17 @@ namespace NMaier.BlockStream.Tests
     [TestMethod]
     public void BlockStreamWriterCompAesLZ4Test()
     {
-      BlockStreamWriterSizeTestInternal(
-        new CompositeTransformer(new NoneBlockTransformer(), new AESAndMACTransformer("test3"),
-                                 new LZ4CompressorTransformer()));
+      BlockStreamWriterSizeTestInternal(new CompositeTransformer(new NoneBlockTransformer(),
+                                                                 new AESAndMACTransformer("test3"),
+                                                                 new LZ4CompressorTransformer()));
     }
 
     [TestMethod]
     public void BlockStreamWriterCompLZ4ChaTest()
     {
-      BlockStreamWriterSizeTestInternal(
-        new CompositeTransformer(new LZ4CompressorTransformer(), new ChaChaAndPolyTransformer("test4"),
-                                 new NoneBlockTransformer()));
+      BlockStreamWriterSizeTestInternal(new CompositeTransformer(new LZ4CompressorTransformer(),
+                                                                 new ChaChaAndPolyTransformer("test4"),
+                                                                 new NoneBlockTransformer()));
     }
 
     [TestMethod]
@@ -287,7 +287,7 @@ namespace NMaier.BlockStream.Tests
 
     private sealed class BlockCache : IBlockCache
     {
-      readonly Dictionary<long, byte[]> items = new Dictionary<long, byte[]>();
+      private readonly Dictionary<long, byte[]> items = new Dictionary<long, byte[]>();
 
       public void Cache(Span<byte> block, long offset)
       {

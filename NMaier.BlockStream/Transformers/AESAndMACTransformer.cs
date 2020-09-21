@@ -117,11 +117,11 @@ namespace NMaier.BlockStream
           counterEncryptor = symmetricAlgorithm.CreateEncryptor(key, rgbIV);
         }
 
-        public bool CanReuseTransform { get { return false; } }
-        public bool CanTransformMultipleBlocks { get { return true; } }
+        public bool CanReuseTransform => false;
+        public bool CanTransformMultipleBlocks => true;
 
-        public int InputBlockSize { get { return symmetricAlgorithm.BlockSize / 8; } }
-        public int OutputBlockSize { get { return symmetricAlgorithm.BlockSize / 8; } }
+        public int InputBlockSize => symmetricAlgorithm.BlockSize / 8;
+        public int OutputBlockSize => symmetricAlgorithm.BlockSize / 8;
 
         public int TransformBlock(byte[] inputBuffer, int inputOffset, int inputCount, byte[] outputBuffer,
           int outputOffset)
