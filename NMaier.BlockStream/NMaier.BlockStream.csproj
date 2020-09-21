@@ -9,13 +9,17 @@
     <Authors>Nils Maier</Authors>
     <Company />
     <Product />
-    <Description>Streams that wrap streams, to write blocks, that can be transparently transformed!</Description>
+    <Description>Streams that wrap streams, to write blocks, that can be transparently transformed, e.g. encrypted or compressed!</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>1.8.0</Version>
+    <Version>1.8.1</Version>
 
     <IncludeSymbols>true</IncludeSymbols>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <PackageProjectUrl>https://github.com/nmaier/NMaier.BlockStream</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nmaier/NMaier.BlockStream</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>streams, block streams, encrypted streams, compressed streams</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
