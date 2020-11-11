@@ -11,7 +11,7 @@
     <Product />
     <Description>Streams that wrap streams, to write blocks, that can be transparently transformed, e.g. encrypted or compressed!</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>1.8.1</Version>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
 
     <IncludeSymbols>true</IncludeSymbols>
     <DebugType>full</DebugType>
@@ -27,6 +27,10 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="K4os.Compression.LZ4" Version="1.2.6" />
+    <PackageReference Include="MinVer" Version="2.3.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="5.0.0" />
   </ItemGroup>
 
