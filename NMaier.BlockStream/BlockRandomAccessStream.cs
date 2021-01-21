@@ -1,8 +1,9 @@
 ﻿using System;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
+
 using JetBrains.Annotations;
+
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace NMaier.BlockStream
@@ -40,8 +41,12 @@ namespace NMaier.BlockStream
     /// <param name="wrappedStream">Stream to be wrapped</param>
     /// <param name="blockSize">Block size to use</param>
     /// <param name="cache">Optional block cache</param>
-    public BlockRandomAccessStream(Stream wrappedStream, short blockSize = BLOCK_SIZE, IBlockCache? cache = null) :
-      this(wrappedStream, new NoneBlockTransformer(), blockSize, cache)
+    public BlockRandomAccessStream(Stream wrappedStream, short blockSize = BLOCK_SIZE,
+      IBlockCache? cache = null) : this(
+      wrappedStream,
+      new NoneBlockTransformer(),
+      blockSize,
+      cache)
     {
     }
 
@@ -65,9 +70,25 @@ namespace NMaier.BlockStream
     /// <param name="transformer">Block transformer to use</param>
     /// <param name="blockSize">Block size to use</param>
     /// <param name="cache">Optional block cache</param>
-    public BlockRandomAccessStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE,
-      IBlockCache? cache = null) : base(wrappedStream, transformer, blockSize, cache)
+    public BlockRandomAccessStream(Stream wrappedStream, IBlockTransformer transformer,
+      short blockSize = BLOCK_SIZE, IBlockCache? cache = null) : base(
+      wrappedStream,
+      transformer,
+      blockSize,
+      cache)
     {
+      if (!wrappedStream.CanSeek) {
+        throw new ArgumentException("Streams must be seekable", nameof(wrappedStream));
+      }
+
+      if (!wrappedStream.CanRead) {
+        throw new ArgumentException("Streams must be readable", nameof(wrappedStream));
+      }
+
+      if (!wrappedStream.CanWrite) {
+        throw new ArgumentException("Streams must be writable", nameof(wrappedStream));
+      }
+
       ReadIndex();
     }
 
@@ -75,7 +96,8 @@ namespace NMaier.BlockStream
     public override bool CanSeek => true;
     public override bool CanWrite => true;
 
-    [SuppressMessage("ReSharper", "ConvertToAutoPropertyWithPrivateSetter")]
+    public override bool CanTimeout => WrappedStream.CanTimeout;
+
     public override long Length => CurrentLength;
 
     public override long Position
@@ -113,54 +135,65 @@ namespace NMaier.BlockStream
         return;
       }
 
-      // Update already allocated block
-      if (currentIndex >= 0) {
-        if (!Extents.TryGetValue(currentIndex, out var extent)) {
-          throw new IOException("Cannot write to bad extent");
-        }
-
-        var transformed = Transformer.TransformBlock(currentBlock.AsSpan(0, BlockSize));
-        var isLast = currentIndex != Extents.Count - 1;
-        if (transformed.Length > extent.Length && isLast) {
-          throw new IOException("Cannot write new compressable block larger than on disk block");
-        }
-
-        WrappedStream.Seek(extent.Offset, SeekOrigin.Begin);
-        WrappedStream.Write(transformed);
-        Extents[currentIndex] = new Extent(extent.Offset, (short)transformed.Length);
-        if (transformed.Length != extent.Length) {
-          if (isLast) {
-            WriteFooterLengthAndLast(extent.Offset, (short)transformed.Length);
+      switch (currentIndex) {
+        case >= 0: {
+          // Update already allocated block
+          if (!Extents.TryGetValue(currentIndex, out var extent)) {
+            ThrowHelpers.ThrowBadExtent();
           }
-          else {
-            WriteFooter();
+
+          var transformed = Transformer.TransformBlock(currentBlock.AsSpan(0, BlockSize));
+          var isNotLast = currentIndex != Extents.Count - 1;
+          if (transformed.Length > extent.Length && isNotLast) {
+            ThrowHelpers.ThrowLargeBlock();
           }
-        }
-        else if (CurrentFooterLength != CurrentLength) {
-          WriteFooterLength();
-        }
-      }
-      else if (currentIndex == -1) {
-        var newindex = Extents.Count;
-        var last = newindex > 0 ? Extents[newindex - 1] : new Extent(0, 0);
-        var transformed = Transformer.TransformBlock(currentBlock.AsSpan(0, BlockSize));
-        if (transformed.Length > short.MaxValue) {
-          throw new IOException("transformed block too large!");
-        }
 
-        var extent = new Extent(last.Offset + last.Length, (short)transformed.Length);
-        // Write a placeholder (which moves the footer)
-        Extents[newindex] = new Extent(-1, (short)transformed.Length);
-        WriteFooter();
+          if (WrappedStream.Seek(extent.Offset, SeekOrigin.Begin) != extent.Offset) {
+            ThrowHelpers.ThrowSeekFailed();
+          }
 
-        // Write full block
-        WrappedStream.Seek(extent.Offset, SeekOrigin.Begin);
-        WrappedStream.Write(transformed);
-        Extents[newindex] = extent;
-        WriteFooter();
-      }
-      else {
-        throw new IOException("Corrupt currentIndex");
+          WrappedStream.Write(transformed);
+          Extents[currentIndex] = new Extent(extent.Offset, (short)transformed.Length);
+          if (transformed.Length != extent.Length) {
+            if (isNotLast) {
+              ThrowHelpers.ThrowNoRandom();
+            }
+            else {
+              WriteFooter();
+            }
+          }
+          else if (CurrentFooterLength != CurrentLength) {
+            WriteFooterLength();
+          }
+
+          break;
+        }
+        case -1: {
+          var newindex = Extents.Count;
+          var last = newindex > 0 ? Extents[newindex - 1] : new Extent(0, 0);
+          var transformed = Transformer.TransformBlock(currentBlock.AsSpan(0, BlockSize));
+          if (transformed.Length > short.MaxValue) {
+            ThrowHelpers.ThrowBlockTooLarge();
+          }
+
+          var extent = new Extent(last.Offset + last.Length, (short)transformed.Length);
+          // Write a placeholder (which moves the footer)
+          Extents[newindex] = new Extent(-1, (short)transformed.Length);
+          WriteFooter();
+
+          // Write full block
+          if (WrappedStream.Seek(extent.Offset, SeekOrigin.Begin) != extent.Offset) {
+            ThrowHelpers.ThrowSeekFailed();
+          }
+
+          WrappedStream.Write(transformed);
+          Extents[newindex] = extent;
+          WriteFooter();
+          break;
+        }
+        default:
+          ThrowHelpers.ThrowCorruptCurrentIndex();
+          break;
       }
 
       MakeClean(flushToDisk);
@@ -174,6 +207,11 @@ namespace NMaier.BlockStream
 
     public override int Read(Span<byte> buffer)
     {
+      if (Position >= Length) {
+        Position = Length;
+        return 0;
+      }
+
       var read = 0;
       for (;;) {
         var block = CurrentPosition / BlockSize;
@@ -183,7 +221,9 @@ namespace NMaier.BlockStream
 
         var bpos = CurrentPosition % BlockSize;
         // Must not over-read
-        var rem = Math.Min(Math.Min(CurrentLength - CurrentPosition, BlockSize - bpos), buffer.Length);
+        var rem = Math.Min(
+          Math.Min(CurrentLength - CurrentPosition, BlockSize - bpos),
+          buffer.Length);
         if (rem == 0) {
           return read;
         }
@@ -204,27 +244,40 @@ namespace NMaier.BlockStream
       switch (origin) {
         case SeekOrigin.Begin:
           if (offset < 0) {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must be positive");
+            ThrowHelpers.ThrowArgumentOutOfRangeException(
+              nameof(offset),
+              offset,
+              "Offset must be positive");
           }
 
           CurrentPosition = offset;
           break;
         case SeekOrigin.Current:
           if (offset + CurrentPosition < 0) {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must result in a positive position");
+            ThrowHelpers.ThrowArgumentOutOfRangeException(
+              nameof(offset),
+              offset,
+              "Offset must result in a positive position");
           }
 
           CurrentPosition += offset;
           break;
         case SeekOrigin.End:
           if (offset + CurrentLength < 0) {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must result in a positive position");
+            ThrowHelpers.ThrowArgumentOutOfRangeException(
+              nameof(offset),
+              offset,
+              "Offset must result in a positive position");
           }
 
           CurrentPosition = CurrentLength + offset;
           break;
         default:
-          throw new ArgumentOutOfRangeException(nameof(origin), origin, null);
+          ThrowHelpers.ThrowArgumentOutOfRangeException(
+            nameof(origin),
+            origin,
+            "Invalid Origin");
+          break;
       }
 
       return CurrentPosition;
@@ -233,7 +286,10 @@ namespace NMaier.BlockStream
     public override void SetLength(long value)
     {
       if (value < 0) {
-        throw new ArgumentOutOfRangeException(nameof(value), value, "Length must be positive");
+        ThrowHelpers.ThrowArgumentOutOfRangeException(
+          nameof(value),
+          value,
+          "Length must be positive");
       }
 
       // Nothing to be done
@@ -254,14 +310,17 @@ namespace NMaier.BlockStream
       if (value > CurrentLength) {
         Flush();
         // Grow
-        Seek(0, SeekOrigin.End);
+        _ = Seek(0, SeekOrigin.End);
         var rem = value - CurrentLength;
-        Span<byte> buff = stackalloc byte[4096];
+        Span<byte> buff = stackalloc byte[(int)Math.Min(rem, 4096)];
+        var pos = Position;
         while (rem > 0) {
           var cur = Math.Min(buff.Length, rem);
           Write(buff.Slice(0, (int)cur));
           rem -= cur;
         }
+
+        _ = Seek(pos, SeekOrigin.Begin);
 
         Flush();
         return;
@@ -270,10 +329,14 @@ namespace NMaier.BlockStream
       // Shrink
       var maxblock = (long)Math.Ceiling((double)value / BlockSize);
       while (Extents.Count >= maxblock) {
-        Extents.Remove(Extents.Count);
+        _ = Extents.Remove(Extents.Count - 1);
       }
 
       CurrentLength = value;
+      if (CurrentPosition > value) {
+        _ = Seek(0, SeekOrigin.End);
+      }
+
       WriteFooter();
       MakeClean(false);
     }
@@ -283,7 +346,7 @@ namespace NMaier.BlockStream
       Write(buffer.AsSpan(offset, count));
     }
 
-#if NET48
+#if NETFRAMEWORK
     /// <summary>
     ///   See <see cref="Write(byte[],int,int)" />
     /// </summary>
@@ -294,7 +357,7 @@ namespace NMaier.BlockStream
 #endif
     {
       if (Transformer.MayChangeSize && CurrentPosition < CurrentLength) {
-        throw new IOException("Cannot random write to compressable stream");
+        ThrowHelpers.ThrowNoRandom();
       }
 
       while (buffer.Length > 0) {
@@ -348,7 +411,7 @@ namespace NMaier.BlockStream
       Flush();
       if (extent.Length == 0) {
         if (!Transformer.MayChangeSize) {
-          throw new IOException("Invalid extent");
+          ThrowHelpers.ThrowInvalidExtent();
         }
 
         // Empty placeholder block
@@ -360,13 +423,13 @@ namespace NMaier.BlockStream
       blockSpan.Clear();
       if (Cache == null || !Cache.TryReadBlock(blockSpan, block)) {
         WrappedStream.Seek(extent.Offset, SeekOrigin.Begin);
-#if NET48
+#if NETFRAMEWORK
         WrappedStream.ReadFullBlock(currentBlock, extentSpan.Length);
 #else
         WrappedStream.ReadFullBlock(extentSpan);
 #endif
         if (Transformer.UntransformBlock(extentSpan, currentBlock) != BlockSize) {
-          throw new IOException("Corrupt transformed block");
+          ThrowHelpers.ThrowCorruptBlock();
         }
 
         Cache?.Cache(blockSpan, block);
@@ -400,21 +463,28 @@ namespace NMaier.BlockStream
         return;
       }
 
-      WrappedStream.Seek(-(sizeof(long) * 2), SeekOrigin.End);
+      _ = WrappedStream.Seek(-(sizeof(long) * 2), SeekOrigin.End);
       Span<byte> blen = stackalloc byte[sizeof(long) * 2];
       WrappedStream.ReadFullBlock(blen);
       var footerLength = ReadInt64LittleEndian(blen);
-      CurrentFooterLength = CurrentLength = ReadInt64LittleEndian(blen.Slice(sizeof(long)));
-      WrappedStream.Seek(-(sizeof(long) * 2) - footerLength, SeekOrigin.End);
-      var footer = footerLength < 4096 ? stackalloc byte[(int)footerLength] : new byte[footerLength];
+      CurrentFooterLength =
+        CurrentLength = ReadInt64LittleEndian(blen.Slice(sizeof(long)));
+      _ = WrappedStream.Seek(-(sizeof(long) * 2) - footerLength, SeekOrigin.End);
+      var footer = footerLength < 4096
+        ? stackalloc byte[(int)footerLength]
+        : new byte[footerLength];
       WrappedStream.ReadFullBlock(footer);
       var block = 0L;
       while (footer.Length > 0) {
-        var extent = new Extent(ReadInt64LittleEndian(footer), ReadInt16LittleEndian(footer.Slice(sizeof(long))));
+        var extent = new Extent(
+          ReadInt64LittleEndian(footer),
+          ReadInt16LittleEndian(footer.Slice(sizeof(long))));
+#pragma warning disable IDE0078 // Use pattern matching
         if (extent.Offset < 0 || extent.Length < 0) {
+#pragma warning restore IDE0078 // Use pattern matching
           // Tombstone extents can only happen in the very end of the file, when the program was interrupted before being able to full allocate new blocks.
           // We ignore them and do not actually allocate blocks
-          // FillBlockWithInit/WriteFooter will later fix up the stuff, as needed
+          // FillBlockWithInit/WriteFooter will later fix up the stuff, as needed.
           continue;
         }
 

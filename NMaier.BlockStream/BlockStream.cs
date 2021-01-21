@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
@@ -13,18 +14,21 @@ namespace NMaier.BlockStream
     public const short BLOCK_SIZE = 16384;
     protected internal readonly short BlockSize;
     protected readonly IBlockCache? Cache;
-    protected readonly Dictionary<long, Extent> Extents = new Dictionary<long, Extent>();
+    protected readonly Dictionary<long, Extent> Extents = new();
     protected readonly IBlockTransformer Transformer;
     protected readonly Stream WrappedStream;
     protected long CurrentFooterLength;
     protected long CurrentLength;
     protected long CurrentPosition;
 
-    protected BlockStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE,
-      IBlockCache? cache = null)
+    protected BlockStream(Stream wrappedStream, IBlockTransformer transformer,
+      short blockSize = BLOCK_SIZE, IBlockCache? cache = null)
     {
-      if (blockSize < 512 || blockSize > 28671) {
-        throw new ArgumentOutOfRangeException(nameof(blockSize));
+      if (blockSize is < 512 or > 28671) {
+        ThrowHelpers.ThrowArgumentOutOfRangeException(
+          nameof(blockSize),
+          blockSize,
+          "Block size has to be >= 512 and <= 28671");
       }
 
       WrappedStream = wrappedStream;
@@ -39,10 +43,6 @@ namespace NMaier.BlockStream
       Extents.Clear();
       Cache?.Dispose();
       WrappedStream.Dispose();
-
-      if (disposing) {
-        GC.SuppressFinalize(this);
-      }
 
       base.Dispose(disposing);
     }
@@ -62,8 +62,8 @@ namespace NMaier.BlockStream
         writer.Write(CurrentLength);
       }
 
-      ms.Seek(0, SeekOrigin.Begin);
-      WrappedStream.Seek(totalLength, SeekOrigin.Begin);
+      _ = ms.Seek(0, SeekOrigin.Begin);
+      _ = WrappedStream.Seek(totalLength, SeekOrigin.Begin);
       ms.CopyTo(WrappedStream);
       WrappedStream.SetLength(WrappedStream.Position);
       CurrentFooterLength = CurrentLength;
@@ -75,20 +75,7 @@ namespace NMaier.BlockStream
       Span<byte> buf = stackalloc byte[LEN];
       BinaryPrimitives.WriteInt64LittleEndian(buf, CurrentLength);
 
-      WrappedStream.Seek(-LEN, SeekOrigin.End);
-      WrappedStream.Write(buf);
-      CurrentFooterLength = CurrentLength;
-    }
-
-    protected void WriteFooterLengthAndLast(long offset, short count)
-    {
-      const int LEN = sizeof(long) * 2 + sizeof(short);
-      Span<byte> buf = stackalloc byte[LEN];
-      BinaryPrimitives.WriteInt64LittleEndian(buf, offset);
-      BinaryPrimitives.WriteInt16LittleEndian(buf.Slice(sizeof(long)), count);
-      BinaryPrimitives.WriteInt64LittleEndian(buf.Slice(sizeof(long) + sizeof(short)), CurrentLength);
-
-      WrappedStream.Seek(-LEN, SeekOrigin.End);
+      _ = WrappedStream.Seek(-LEN, SeekOrigin.End);
       WrappedStream.Write(buf);
       CurrentFooterLength = CurrentLength;
     }

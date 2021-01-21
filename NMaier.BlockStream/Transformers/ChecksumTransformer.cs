@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.IO;
 using System.Runtime.CompilerServices;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
@@ -15,8 +15,8 @@ namespace NMaier.BlockStream
     private static readonly ulong[] utable = GenerateTable(0xD800000000000000);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong ComputeChecksum(ReadOnlySpan<byte> data, ulong initialValue = ulong.MaxValue,
-      ulong finalXor = ulong.MaxValue)
+    private static ulong ComputeChecksum(ReadOnlySpan<byte> data,
+      ulong initialValue = ulong.MaxValue, ulong finalXor = ulong.MaxValue)
     {
       var table = utable.AsSpan();
       for (int i = 0, e = data.Length; i < e; i++) {
@@ -65,9 +65,11 @@ namespace NMaier.BlockStream
     /// <inheritdoc />
     public int UntransformBlock(ReadOnlySpan<byte> input, Span<byte> block)
     {
-      var sum = BinaryPrimitives.ReadUInt64LittleEndian(input.Slice(input.Length - sizeof(ulong)));
+      var sum =
+        BinaryPrimitives.ReadUInt64LittleEndian(
+          input.Slice(input.Length - sizeof(ulong)));
       if (sum != ComputeChecksum(input.Slice(0, input.Length - sizeof(ulong)))) {
-        throw new IOException("Mismatched checksum");
+        ThrowHelpers.ThrowMismatchedChecksum();
       }
 
       if (!input.Overlaps(block, out var off) || off != 0) {

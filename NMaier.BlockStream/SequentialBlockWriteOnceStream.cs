@@ -3,6 +3,7 @@ using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
@@ -25,8 +26,11 @@ namespace NMaier.BlockStream
     /// <param name="wrappedStream">Stream to wrap</param>
     /// <param name="transformer">Block transformer to use</param>
     /// <param name="blockSize">Block size to use</param>
-    public SequentialBlockWriteOnceStream([NotNull] Stream wrappedStream, [NotNull] IBlockTransformer transformer,
-      short blockSize = BLOCK_SIZE) : base(wrappedStream, transformer, blockSize)
+    public SequentialBlockWriteOnceStream([NotNull] Stream wrappedStream,
+      [NotNull] IBlockTransformer transformer, short blockSize = BLOCK_SIZE) : base(
+      wrappedStream,
+      transformer,
+      blockSize)
     {
     }
 
@@ -59,10 +63,12 @@ namespace NMaier.BlockStream
       if (fill > 0) {
         var transformed = Transformer.TransformBlock(currentBlock.AsSpan(0, fill));
         if (transformed.Length > short.MaxValue) {
-          throw new IOException("Transformed block too large");
+          ThrowHelpers.ThrowBlockTooLarge();
         }
 
-        var size = new[] { (short)transformed.Length };
+        var size = new[] {
+          (short)transformed.Length
+        };
         WrappedStream.Write(MemoryMarshal.Cast<short, byte>(size.AsSpan()));
         WrappedStream.Write(transformed);
         fill = 0;
@@ -103,7 +109,7 @@ namespace NMaier.BlockStream
       Write(buffer.AsSpan(offset, count));
     }
 
-#if NET48
+#if NETFRAMEWORK
     /// <summary>
     ///   See <see cref="Write(byte[],int,int)" />
     /// </summary>

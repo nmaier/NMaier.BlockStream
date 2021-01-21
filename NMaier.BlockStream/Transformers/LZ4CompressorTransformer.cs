@@ -1,7 +1,7 @@
 ﻿using System;
-using System.IO;
-using System.Runtime.CompilerServices;
+
 using JetBrains.Annotations;
+
 using K4os.Compression.LZ4;
 
 namespace NMaier.BlockStream
@@ -12,12 +12,6 @@ namespace NMaier.BlockStream
   [PublicAPI]
   public sealed class LZ4CompressorTransformer : IBlockTransformer
   {
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowInvalidData()
-    {
-      throw new IOException("Invalid LZ4 data");
-    }
-
     /// <inheritdoc />
     public bool MayChangeSize => true;
 
@@ -35,7 +29,7 @@ namespace NMaier.BlockStream
       if (!input.Overlaps(block)) {
         var read = LZ4Codec.Decode(input, block);
         if (read < 0) {
-          ThrowInvalidData();
+          ThrowHelpers.ThrowInvalidLZ4Data();
         }
 
         return read;
@@ -45,7 +39,7 @@ namespace NMaier.BlockStream
         input = input.ToArray();
         var read = LZ4Codec.Decode(input, block);
         if (read < 0) {
-          ThrowInvalidData();
+          ThrowHelpers.ThrowInvalidLZ4Data();
         }
 
         return read;
@@ -54,7 +48,7 @@ namespace NMaier.BlockStream
       var block2 = new byte[block.Length];
       var rv = LZ4Codec.Decode(input, block2);
       if (rv < 0) {
-        ThrowInvalidData();
+        ThrowHelpers.ThrowInvalidLZ4Data();
       }
 
       block2.AsSpan(0, rv).CopyTo(block);

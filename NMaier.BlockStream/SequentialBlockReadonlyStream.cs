@@ -3,12 +3,13 @@ using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
 {
   /// <summary>
-  ///   A sequential reader block stream. This kind of stream cannot be seeked, however it has more lax requirements for
+  ///   A sequential reader block stream. This kind of stream is not seek-able, however it has more lax requirements for
   ///   blocks.
   /// </summary>
   /// <remarks>Compatible with output produced by <see cref="SequentialBlockWriteOnceStream" /></remarks>
@@ -20,14 +21,22 @@ namespace NMaier.BlockStream
     private short pos;
 
 
-    public SequentialBlockReadonlyStream([NotNull] Stream wrappedStream, [NotNull] IBlockTransformer transformer,
-      short blockSize = BLOCK_SIZE) : base(wrappedStream, transformer, blockSize)
+    public SequentialBlockReadonlyStream([NotNull] Stream wrappedStream,
+      [NotNull] IBlockTransformer transformer, short blockSize = BLOCK_SIZE) : base(
+      wrappedStream,
+      transformer,
+      blockSize)
     {
+      if (!wrappedStream.CanRead) {
+        throw new ArgumentException("Streams must be readable", nameof(wrappedStream));
+      }
     }
 
     public override bool CanRead => true;
 
     public override bool CanSeek => false;
+
+    public override bool CanTimeout => WrappedStream.CanTimeout;
 
     public override bool CanWrite => false;
 
@@ -108,14 +117,14 @@ namespace NMaier.BlockStream
       Span<short> size = stackalloc short[1];
       WrappedStream.ReadFullBlock(MemoryMarshal.Cast<short, byte>(size));
       if (size[0] <= 0) {
-        throw new IOException("Invalid block");
+        ThrowHelpers.ThrowInvalidBlock();
       }
 
       var buffer = currentBlock.AsSpan(0, size[0]);
       WrappedStream.ReadFullBlock(buffer);
       var transformed = Transformer.UntransformBlock(buffer, currentBlock);
       if (transformed > BlockSize || transformed <= 0) {
-        throw new IOException("Invalid block");
+        ThrowHelpers.ThrowInvalidBlock();
       }
 
       fill = (short)transformed;

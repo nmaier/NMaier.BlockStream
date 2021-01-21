@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.IO;
-using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
@@ -13,16 +13,18 @@ namespace NMaier.BlockStream
   ///   Transforms data using ChaCha20 and verifies data using a Poly1305 MAC.
   /// </summary>
   [PublicAPI]
+  [SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "Not needed")]
+  [SuppressMessage(
+    "CodeQuality",
+    "IDE0079:Remove unnecessary suppression",
+    Justification = "compat")]
   public sealed class ChaChaAndPolyTransformer : IBlockTransformer
   {
     private const int NONCE_LENGTH = 12;
     private const int TAG_LENGTH = 16;
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowCorruptData()
-    {
-      throw new IOException("Corrupt data");
-    }
 
     private readonly uint cstate04;
     private readonly uint cstate05;
@@ -33,7 +35,8 @@ namespace NMaier.BlockStream
     private readonly uint cstate10;
     private readonly uint cstate11;
 
-    private readonly RandomNumberGenerator nonceGenerator = new RNGCryptoServiceProvider();
+    private readonly RandomNumberGenerator
+      nonceGenerator = new RNGCryptoServiceProvider();
 
     private readonly uint polyr0;
     private readonly uint polyr1;
@@ -70,30 +73,63 @@ namespace NMaier.BlockStream
     {
       // This is essentially OK. We never store the pass phrase or the derived key ourselves.
       // This will still allow one to try pass phrases fast-ish, if that's what he's after.
-      using var derSalt = new Rfc2898DeriveBytes(key, new byte[] { 0xf9, 0x03, 0x02, 0xea, 0x42, 0x23, 0xab, 0xff }, 1);
-      using var der = new Rfc2898DeriveBytes(derSalt.GetBytes(64), derSalt.GetBytes(12), 100);
+      using var derSalt = new Rfc2898DeriveBytes(
+        key,
+        new byte[] {
+          0xf9,
+          0x03,
+          0x02,
+          0xea,
+          0x42,
+          0x23,
+          0xab,
+          0xff
+        },
+        1);
+      using var der = new Rfc2898DeriveBytes(
+        derSalt.GetBytes(64),
+        derSalt.GetBytes(12),
+        100);
 
       var cipherKey = der.GetBytes(32);
-      cstate04 = (uint)(cipherKey[0] | (cipherKey[1] << 8) | (cipherKey[2] << 16) | (cipherKey[3] << 24));
-      cstate05 = (uint)(cipherKey[4] | (cipherKey[5] << 8) | (cipherKey[6] << 16) | (cipherKey[7] << 24));
-      cstate06 = (uint)(cipherKey[8] | (cipherKey[9] << 8) | (cipherKey[10] << 16) | (cipherKey[11] << 24));
-      cstate07 = (uint)(cipherKey[12] | (cipherKey[13] << 8) | (cipherKey[14] << 16) | (cipherKey[15] << 24));
-      cstate08 = (uint)(cipherKey[16] | (cipherKey[17] << 8) | (cipherKey[18] << 16) | (cipherKey[19] << 24));
-      cstate09 = (uint)(cipherKey[20] | (cipherKey[21] << 8) | (cipherKey[22] << 16) | (cipherKey[23] << 24));
-      cstate10 = (uint)(cipherKey[24] | (cipherKey[25] << 8) | (cipherKey[26] << 16) | (cipherKey[27] << 24));
-      cstate11 = (uint)(cipherKey[28] | (cipherKey[29] << 8) | (cipherKey[30] << 16) | (cipherKey[31] << 24));
+      cstate04 = (uint)(cipherKey[0] | (cipherKey[1] << 8) | (cipherKey[2] << 16) |
+                        (cipherKey[3] << 24));
+      cstate05 = (uint)(cipherKey[4] | (cipherKey[5] << 8) | (cipherKey[6] << 16) |
+                        (cipherKey[7] << 24));
+      cstate06 = (uint)(cipherKey[8] | (cipherKey[9] << 8) | (cipherKey[10] << 16) |
+                        (cipherKey[11] << 24));
+      cstate07 = (uint)(cipherKey[12] | (cipherKey[13] << 8) | (cipherKey[14] << 16) |
+                        (cipherKey[15] << 24));
+      cstate08 = (uint)(cipherKey[16] | (cipherKey[17] << 8) | (cipherKey[18] << 16) |
+                        (cipherKey[19] << 24));
+      cstate09 = (uint)(cipherKey[20] | (cipherKey[21] << 8) | (cipherKey[22] << 16) |
+                        (cipherKey[23] << 24));
+      cstate10 = (uint)(cipherKey[24] | (cipherKey[25] << 8) | (cipherKey[26] << 16) |
+                        (cipherKey[27] << 24));
+      cstate11 = (uint)(cipherKey[28] | (cipherKey[29] << 8) | (cipherKey[30] << 16) |
+                        (cipherKey[31] << 24));
 
       var tagKey = der.GetBytes(32);
-      polyr0 = (uint)(tagKey[0] | (tagKey[1] << 8) | (tagKey[2] << 16) | (tagKey[3] << 24)) & 0x3ffffff;
-      polyr1 = ((uint)(tagKey[3] | (tagKey[4] << 8) | (tagKey[5] << 16) | (tagKey[6] << 24)) >> 2) & 0x3ffff03;
-      polyr2 = ((uint)(tagKey[6] | (tagKey[7] << 8) | (tagKey[8] << 16) | (tagKey[9] << 24)) >> 4) & 0x3ffc0ff;
-      polyr3 = ((uint)(tagKey[9] | (tagKey[10] << 8) | (tagKey[11] << 16) | (tagKey[12] << 24)) >> 6) & 0x3f03fff;
-      polyr4 = ((uint)(tagKey[12] | (tagKey[13] << 8) | (tagKey[14] << 16) | (tagKey[15] << 24)) >> 8) & 0x00fffff;
+      polyr0 =
+        (uint)(tagKey[0] | (tagKey[1] << 8) | (tagKey[2] << 16) | (tagKey[3] << 24)) &
+        0x3ffffff;
+      polyr1 = ((uint)(tagKey[3] | (tagKey[4] << 8) | (tagKey[5] << 16) |
+                       (tagKey[6] << 24)) >> 2) & 0x3ffff03;
+      polyr2 = ((uint)(tagKey[6] | (tagKey[7] << 8) | (tagKey[8] << 16) |
+                       (tagKey[9] << 24)) >> 4) & 0x3ffc0ff;
+      polyr3 = ((uint)(tagKey[9] | (tagKey[10] << 8) | (tagKey[11] << 16) |
+                       (tagKey[12] << 24)) >> 6) & 0x3f03fff;
+      polyr4 = ((uint)(tagKey[12] | (tagKey[13] << 8) | (tagKey[14] << 16) |
+                       (tagKey[15] << 24)) >> 8) & 0x00fffff;
 
-      polys0 = (uint)(tagKey[16] | (tagKey[17] << 8) | (tagKey[18] << 16) | (tagKey[19] << 24));
-      polys1 = (uint)(tagKey[20] | (tagKey[21] << 8) | (tagKey[22] << 16) | (tagKey[23] << 24));
-      polys2 = (uint)(tagKey[24] | (tagKey[25] << 8) | (tagKey[26] << 16) | (tagKey[27] << 24));
-      polys3 = (uint)(tagKey[28] | (tagKey[29] << 8) | (tagKey[30] << 16) | (tagKey[31] << 24));
+      polys0 = (uint)(tagKey[16] | (tagKey[17] << 8) | (tagKey[18] << 16) |
+                      (tagKey[19] << 24));
+      polys1 = (uint)(tagKey[20] | (tagKey[21] << 8) | (tagKey[22] << 16) |
+                      (tagKey[23] << 24));
+      polys2 = (uint)(tagKey[24] | (tagKey[25] << 8) | (tagKey[26] << 16) |
+                      (tagKey[27] << 24));
+      polys3 = (uint)(tagKey[28] | (tagKey[29] << 8) | (tagKey[30] << 16) |
+                      (tagKey[31] << 24));
     }
 
     /// <inheritdoc />
@@ -105,8 +141,11 @@ namespace NMaier.BlockStream
       var rv = new byte[NONCE_LENGTH + TAG_LENGTH + block.Length];
       nonceGenerator.GetBytes(rv, 0, NONCE_LENGTH);
       block.CopyTo(rv.AsSpan(NONCE_LENGTH + TAG_LENGTH));
-      Cipher(rv.AsSpan(NONCE_LENGTH + TAG_LENGTH), rv.AsSpan(0, NONCE_LENGTH), rv.AsSpan(NONCE_LENGTH, TAG_LENGTH),
-             false);
+      Cipher(
+        rv.AsSpan(NONCE_LENGTH + TAG_LENGTH),
+        rv.AsSpan(0, NONCE_LENGTH),
+        rv.AsSpan(NONCE_LENGTH, TAG_LENGTH),
+        false);
       return rv;
     }
 
@@ -114,7 +153,9 @@ namespace NMaier.BlockStream
     public int UntransformBlock(ReadOnlySpan<byte> input, Span<byte> block)
     {
       var overlaps = input.Overlaps(block);
-      var nonce = !overlaps ? input.Slice(0, NONCE_LENGTH) : input.Slice(0, NONCE_LENGTH).ToArray();
+      var nonce = !overlaps
+        ? input.Slice(0, NONCE_LENGTH)
+        : input.Slice(0, NONCE_LENGTH).ToArray();
       var tag = input.Slice(NONCE_LENGTH, TAG_LENGTH).ToArray();
       var inblock = input.Slice(NONCE_LENGTH + TAG_LENGTH);
       inblock.CopyTo(block);
@@ -122,7 +163,8 @@ namespace NMaier.BlockStream
       return inblock.Length;
     }
 
-    private void Cipher(Span<byte> bytes, ReadOnlySpan<byte> nonce, Span<byte> tag, bool decrypt)
+    private void Cipher(Span<byte> bytes, ReadOnlySpan<byte> nonce, Span<byte> tag,
+      bool decrypt)
     {
       // chacha20 and poly1305 per https://tools.ietf.org/html/rfc7539
       Span<uint> tmpValues = stackalloc uint[16];
@@ -163,22 +205,31 @@ namespace NMaier.BlockStream
       {
         var off = 0;
         for (var l = blockLen; l >= BLOCK_SIZE; l -= BLOCK_SIZE) {
-          h0 += (uint)(buffer[off] | (buffer[off + 1] << 8) | (buffer[off + 2] << 16) | (buffer[off + 3] << 24)) &
+          h0 += (uint)(buffer[off] | (buffer[off + 1] << 8) | (buffer[off + 2] << 16) |
+                       (buffer[off + 3] << 24)) & 0x3ffffff;
+          h1 += ((uint)(buffer[off + 3] | (buffer[off + 4] << 8) |
+                        (buffer[off + 5] << 16) | (buffer[off + 6] << 24)) >> 2) &
                 0x3ffffff;
-          h1 += ((uint)(buffer[off + 3] | (buffer[off + 4] << 8) | (buffer[off + 5] << 16) | (buffer[off + 6] << 24)) >>
-                 2) & 0x3ffffff;
-          h2 += ((uint)(buffer[off + 6] | (buffer[off + 7] << 8) | (buffer[off + 8] << 16) | (buffer[off + 9] << 24)) >>
-                 4) & 0x3ffffff;
-          h3 += ((uint)(buffer[off + 9] | (buffer[off + 10] << 8) | (buffer[off + 11] << 16) |
-                        (buffer[off + 12] << 24)) >> 6) & 0x3ffffff;
-          h4 += ((uint)(buffer[off + 12] | (buffer[off + 13] << 8) | (buffer[off + 14] << 16) |
-                        (buffer[off + 15] << 24)) >> 8) | (1U << 24);
+          h2 += ((uint)(buffer[off + 6] | (buffer[off + 7] << 8) |
+                        (buffer[off + 8] << 16) | (buffer[off + 9] << 24)) >> 4) &
+                0x3ffffff;
+          h3 += ((uint)(buffer[off + 9] | (buffer[off + 10] << 8) |
+                        (buffer[off + 11] << 16) | (buffer[off + 12] << 24)) >> 6) &
+                0x3ffffff;
+          h4 += ((uint)(buffer[off + 12] | (buffer[off + 13] << 8) |
+                        (buffer[off + 14] << 16) | (buffer[off + 15] << 24)) >> 8) |
+                (1U << 24);
 
-          d0 = (ulong)h0 * r0 + (ulong)h1 * s4 + (ulong)h2 * s3 + (ulong)h3 * s2 + (ulong)h4 * s1;
-          d1 = (ulong)h0 * r1 + (ulong)h1 * r0 + (ulong)h2 * s4 + (ulong)h3 * s3 + (ulong)h4 * s2;
-          d2 = (ulong)h0 * r2 + (ulong)h1 * r1 + (ulong)h2 * r0 + (ulong)h3 * s4 + (ulong)h4 * s3;
-          d3 = (ulong)h0 * r3 + (ulong)h1 * r2 + (ulong)h2 * r1 + (ulong)h3 * r0 + (ulong)h4 * s4;
-          d4 = (ulong)h0 * r4 + (ulong)h1 * r3 + (ulong)h2 * r2 + (ulong)h3 * r1 + (ulong)h4 * r0;
+          d0 = ((ulong)h0 * r0) + ((ulong)h1 * s4) + ((ulong)h2 * s3) + ((ulong)h3 * s2) +
+               ((ulong)h4 * s1);
+          d1 = ((ulong)h0 * r1) + ((ulong)h1 * r0) + ((ulong)h2 * s4) + ((ulong)h3 * s3) +
+               ((ulong)h4 * s2);
+          d2 = ((ulong)h0 * r2) + ((ulong)h1 * r1) + ((ulong)h2 * r0) + ((ulong)h3 * s4) +
+               ((ulong)h4 * s3);
+          d3 = ((ulong)h0 * r3) + ((ulong)h1 * r2) + ((ulong)h2 * r1) + ((ulong)h3 * r0) +
+               ((ulong)h4 * s4);
+          d4 = ((ulong)h0 * r4) + ((ulong)h1 * r3) + ((ulong)h2 * r2) + ((ulong)h3 * r1) +
+               ((ulong)h4 * r0);
 
           c = (uint)(d0 >> 26);
           h0 = (uint)d0 & 0x3ffffff;
@@ -388,11 +439,16 @@ namespace NMaier.BlockStream
 
       h0 += 1;
 
-      d0 = (ulong)h0 * r0 + (ulong)h1 * s4 + (ulong)h2 * s3 + (ulong)h3 * s2 + (ulong)h4 * s1;
-      d1 = (ulong)h0 * r1 + (ulong)h1 * r0 + (ulong)h2 * s4 + (ulong)h3 * s3 + (ulong)h4 * s2;
-      d2 = (ulong)h0 * r2 + (ulong)h1 * r1 + (ulong)h2 * r0 + (ulong)h3 * s4 + (ulong)h4 * s3;
-      d3 = (ulong)h0 * r3 + (ulong)h1 * r2 + (ulong)h2 * r1 + (ulong)h3 * r0 + (ulong)h4 * s4;
-      d4 = (ulong)h0 * r4 + (ulong)h1 * r3 + (ulong)h2 * r2 + (ulong)h3 * r1 + (ulong)h4 * r0;
+      d0 = ((ulong)h0 * r0) + ((ulong)h1 * s4) + ((ulong)h2 * s3) + ((ulong)h3 * s2) +
+           ((ulong)h4 * s1);
+      d1 = ((ulong)h0 * r1) + ((ulong)h1 * r0) + ((ulong)h2 * s4) + ((ulong)h3 * s3) +
+           ((ulong)h4 * s2);
+      d2 = ((ulong)h0 * r2) + ((ulong)h1 * r1) + ((ulong)h2 * r0) + ((ulong)h3 * s4) +
+           ((ulong)h4 * s3);
+      d3 = ((ulong)h0 * r3) + ((ulong)h1 * r2) + ((ulong)h2 * r1) + ((ulong)h3 * r0) +
+           ((ulong)h4 * s4);
+      d4 = ((ulong)h0 * r4) + ((ulong)h1 * r3) + ((ulong)h2 * r2) + ((ulong)h3 * r1) +
+           ((ulong)h4 * r0);
 
       c = (uint)(d0 >> 26);
       h0 = (uint)d0 & 0x3ffffff;
@@ -443,7 +499,7 @@ namespace NMaier.BlockStream
       g3 &= 0x3ffffff;
       var g4 = (uint)(h4 + c - (1UL << 26));
 
-      var mask = (g4 >> (sizeof(uint) * 8 - 1)) - 1;
+      var mask = (g4 >> ((sizeof(uint) * 8) - 1)) - 1;
       g0 &= mask;
       g1 &= mask;
       g2 &= mask;
@@ -490,13 +546,15 @@ namespace NMaier.BlockStream
 
       if (BitConverter.IsLittleEndian) {
         if (umac[0] != h0 || umac[1] != h1 || umac[2] != h2 || umac[3] != h3) {
-          ThrowCorruptData();
+          ThrowHelpers.ThrowCorruptData();
         }
       }
       else {
-        if (umac[0] != BinaryPrimitives.ReverseEndianness(h0) || umac[1] != BinaryPrimitives.ReverseEndianness(h1) ||
-            umac[2] != BinaryPrimitives.ReverseEndianness(h2) || umac[3] != BinaryPrimitives.ReverseEndianness(h3)) {
-          ThrowCorruptData();
+        if (umac[0] != BinaryPrimitives.ReverseEndianness(h0) ||
+            umac[1] != BinaryPrimitives.ReverseEndianness(h1) ||
+            umac[2] != BinaryPrimitives.ReverseEndianness(h2) ||
+            umac[3] != BinaryPrimitives.ReverseEndianness(h3)) {
+          ThrowHelpers.ThrowCorruptData();
         }
       }
     }

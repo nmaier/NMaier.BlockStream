@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
@@ -23,23 +24,23 @@ namespace NMaier.BlockStream
     /// <remarks>The wrapped stream must be writable and seekable</remarks>
     /// <param name="wrappedStream">Stream to wrap</param>
     /// <param name="blockSize">Block size to use</param>
-    public BlockWriteOnceStream(Stream wrappedStream, short blockSize = BLOCK_SIZE) : this(
-      wrappedStream, new NoneBlockTransformer(), blockSize)
+    public BlockWriteOnceStream(Stream wrappedStream, short blockSize = BLOCK_SIZE) :
+      this(wrappedStream, new NoneBlockTransformer(), blockSize)
     {
     }
 
     /// <summary>
-    ///   Wraps a generic stream into a block stream using the specified transformer and blocksize.
+    ///   Wraps a generic stream into a block stream using the specified transformer and block size.
     /// </summary>
     /// <remarks>The wrapped stream must be writable and seekable</remarks>
     /// <param name="wrappedStream">Stream to wrap</param>
     /// <param name="transformer">The block transformer to use</param>
     /// <param name="blockSize">Block size to use</param>
-    public BlockWriteOnceStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE) :
-      base(wrappedStream, transformer, blockSize)
+    public BlockWriteOnceStream(Stream wrappedStream, IBlockTransformer transformer,
+      short blockSize = BLOCK_SIZE) : base(wrappedStream, transformer, blockSize)
     {
       currentBlock = new byte[BlockSize];
-      WrappedStream.Seek(0, SeekOrigin.Begin);
+      _ = WrappedStream.Seek(0, SeekOrigin.Begin);
       wrappedStream.SetLength(0);
     }
 
@@ -88,30 +89,14 @@ namespace NMaier.BlockStream
       throw new NotSupportedException();
     }
 
-    /// <summary>
-    ///   Skips to the next block, closing the current one.
-    ///   May be used to avoid some internal fragmentation.
-    /// </summary>
-    public void SkipToNextBlock()
-    {
-      if (fill == 0) {
-        return;
-      }
-
-      currentBlock.AsSpan(fill).Clear();
-      WriteBlock(currentBlock);
-      CurrentPosition = CurrentLength += BlockSize - fill;
-      fill = 0;
-    }
-
     public override void Write(byte[] buffer, int offset, int count)
     {
       Write(buffer.AsSpan(offset, count));
     }
 
-#if NET48
+#if NETFRAMEWORK
     /// <summary>
-    /// See <see cref="Write(byte[],int,int)"/>
+    ///   See <see cref="Write(byte[],int,int)" />
     /// </summary>
     /// <param name="buffer"></param>
     public void Write(ReadOnlySpan<byte> buffer)
@@ -171,10 +156,12 @@ namespace NMaier.BlockStream
     {
       var transformed = Transformer.TransformBlock(block);
       if (transformed.Length > short.MaxValue) {
-        throw new IOException("Transformed block too large");
+        ThrowHelpers.ThrowBlockTooLarge();
       }
 
-      Extents[Extents.Count] = new Extent(WrappedStream.Position, (short)transformed.Length);
+      Extents[Extents.Count] = new Extent(
+        WrappedStream.Position,
+        (short)transformed.Length);
       WrappedStream.Write(transformed);
     }
   }

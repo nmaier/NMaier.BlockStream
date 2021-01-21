@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
@@ -28,10 +28,12 @@ namespace NMaier.BlockStream
     public bool MayChangeSize { get; }
 
     /// <inheritdoc />
-    [SuppressMessage("ReSharper", "LoopCanBeConvertedToQuery")]
     public ReadOnlySpan<byte> TransformBlock(ReadOnlySpan<byte> block)
     {
-      foreach (var t in transformers) {
+      // ReSharper disable once ForCanBeConvertedToForeach
+      // ReSharper disable once LoopCanBeConvertedToQuery
+      for (var i = 0; i < transformers.Length; i++) {
+        var t = transformers[i];
         block = t.TransformBlock(block);
       }
 

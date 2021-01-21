@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.CompilerServices;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
@@ -15,23 +16,47 @@ namespace NMaier.BlockStream
   ///   Compatible with output from <see cref="BlockRandomAccessStream" /> and <see cref="BlockWriteOnceStream" />
   /// </remarks>
   [PublicAPI]
+  [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
+  [SuppressMessage(
+    "CodeQuality",
+    "IDE0079:Remove unnecessary suppression",
+    Justification = "jb")]
   public sealed class BlockReadOnlyStream : BlockStream
   {
     private readonly ReaderEnhancedStream cursor;
     private readonly MemoryMappedFile? mmap;
 
     public BlockReadOnlyStream(Stream wrappedStream, IBlockCache? cache = null) : this(
-      wrappedStream, new NoneBlockTransformer(), cache: cache)
+      wrappedStream,
+      new NoneBlockTransformer(),
+      cache: cache)
     {
     }
 
-    public BlockReadOnlyStream(Stream wrappedStream, IBlockTransformer transformer, short blockSize = BLOCK_SIZE,
-      IBlockCache? cache = null) : base(wrappedStream, transformer, blockSize, cache)
+    public BlockReadOnlyStream(Stream wrappedStream, IBlockTransformer transformer,
+      short blockSize = BLOCK_SIZE, IBlockCache? cache = null) : base(
+      wrappedStream,
+      transformer,
+      blockSize,
+      cache)
     {
+      if (!wrappedStream.CanSeek) {
+        throw new ArgumentException("Streams must be seekable", nameof(wrappedStream));
+      }
+
+      if (!wrappedStream.CanRead) {
+        throw new ArgumentException("Streams must be readable", nameof(wrappedStream));
+      }
+
       ReadIndex();
       if (wrappedStream is FileStream fstream) {
-        mmap = MemoryMappedFile.CreateFromFile(fstream, null, 0, MemoryMappedFileAccess.Read, HandleInheritability.None,
-                                               true);
+        mmap = MemoryMappedFile.CreateFromFile(
+          fstream,
+          null,
+          0,
+          MemoryMappedFileAccess.Read,
+          HandleInheritability.None,
+          true);
       }
 
       cursor = CreateCursor();
@@ -39,9 +64,9 @@ namespace NMaier.BlockStream
 
     public override bool CanRead => true;
     public override bool CanSeek => true;
+    public override bool CanTimeout => WrappedStream.CanTimeout;
     public override bool CanWrite => false;
 
-    [SuppressMessage("ReSharper", "ConvertToAutoPropertyWithPrivateSetter")]
     public override long Length => CurrentLength;
 
     public override long Position
@@ -50,12 +75,6 @@ namespace NMaier.BlockStream
       get => cursor.Position;
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
       set => cursor.Position = value;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ReaderEnhancedStream CreateCursor()
-    {
-      return new BlockReadOnlyCursor(this);
     }
 
     public override void Flush()
@@ -90,18 +109,17 @@ namespace NMaier.BlockStream
       throw new NotSupportedException();
     }
 
-#if !NET48
-    public override void Write(ReadOnlySpan<byte> buffer)
-    {
-      throw new NotSupportedException();
-    }
-#endif
-
     protected override void Dispose(bool disposing)
     {
       mmap?.Dispose();
       cursor.Dispose();
       base.Dispose(disposing);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReaderEnhancedStream CreateCursor()
+    {
+      return new BlockReadOnlyCursor(this);
     }
 
     internal bool FillBlock(in long block, byte[] currentBlock, ref long currentIndex)
@@ -119,7 +137,7 @@ namespace NMaier.BlockStream
 
       if (extent.Length == 0) {
         if (!Transformer.MayChangeSize) {
-          throw new IOException("Invalid extent");
+          ThrowHelpers.ThrowInvalidExtent();
         }
 
         // Empty placeholder block
@@ -131,15 +149,19 @@ namespace NMaier.BlockStream
       blockSpan.Clear();
       if (Cache == null || !Cache.TryReadBlock(blockSpan, block)) {
         if (mmap != null) {
-          using var view = mmap.CreateViewAccessor(extent.Offset, extentSpan.Length, MemoryMappedFileAccess.Read);
-          if (view.ReadArray(0, currentBlock, 0, extentSpan.Length) != extentSpan.Length) {
-            throw new IOException("Truncated read");
+          using var view = mmap.CreateViewAccessor(
+            extent.Offset,
+            extentSpan.Length,
+            MemoryMappedFileAccess.Read);
+          if (view.ReadArray(0, currentBlock, 0, extentSpan.Length) !=
+              extentSpan.Length) {
+            ThrowHelpers.ThrowTruncatedRead();
           }
         }
         else {
           lock (WrappedStream) {
             WrappedStream.Seek(extent.Offset, SeekOrigin.Begin);
-#if NET48
+#if NETFRAMEWORK
             WrappedStream.ReadFullBlock(currentBlock, extentSpan.Length);
 #else
             WrappedStream.ReadFullBlock(extentSpan);
@@ -148,7 +170,7 @@ namespace NMaier.BlockStream
         }
 
         if (Transformer.UntransformBlock(extentSpan, currentBlock) != BlockSize) {
-          throw new IOException("Corrupt transformed block");
+          ThrowHelpers.ThrowCorruptBlock();
         }
 
         Cache?.Cache(blockSpan, block);
@@ -164,20 +186,29 @@ namespace NMaier.BlockStream
         return;
       }
 
-      WrappedStream.Seek(-(sizeof(long) * 2), SeekOrigin.End);
+      _ = WrappedStream.Seek(-(sizeof(long) * 2), SeekOrigin.End);
       Span<byte> blen = stackalloc byte[sizeof(long) * 2];
       WrappedStream.ReadFullBlock(blen);
       var footerLength = BinaryPrimitives.ReadInt64LittleEndian(blen);
-      CurrentFooterLength = CurrentLength = BinaryPrimitives.ReadInt64LittleEndian(blen.Slice(sizeof(long)));
-      WrappedStream.Seek(-(sizeof(long) * 2) - footerLength, SeekOrigin.End);
-      var footer = footerLength < 4096 ? stackalloc byte[(int)footerLength] : new byte[footerLength];
+      CurrentFooterLength = CurrentLength =
+        BinaryPrimitives.ReadInt64LittleEndian(blen.Slice(sizeof(long)));
+      _ = WrappedStream.Seek(-(sizeof(long) * 2) - footerLength, SeekOrigin.End);
+      var footer = footerLength < 4096
+        ? stackalloc byte[(int)footerLength]
+        : new byte[footerLength];
       WrappedStream.ReadFullBlock(footer);
 
       var block = 0L;
       while (footer.Length > 0) {
-        var extent = new Extent(BinaryPrimitives.ReadInt64LittleEndian(footer),
-                                BinaryPrimitives.ReadInt16LittleEndian(footer.Slice(sizeof(long))));
-        if (extent.Offset < 0 || extent.Length < 0) {
+        var extent = new Extent(
+          BinaryPrimitives.ReadInt64LittleEndian(footer),
+          BinaryPrimitives.ReadInt16LittleEndian(footer.Slice(sizeof(long))));
+#pragma warning disable IDE0078 // Use pattern matching
+        if (extent.Offset < 0L || extent.Length < 0) {
+#pragma warning restore IDE0078 // Use pattern matching
+          // Tombstone extents can only happen in the very end of the file, when the program was interrupted before being able to full allocate new blocks.
+          // We ignore them and do not actually allocate blocks
+          // FillBlockWithInit/WriteFooter will later fix up the stuff, as needed.
           continue;
         }
 

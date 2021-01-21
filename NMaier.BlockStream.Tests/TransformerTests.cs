@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace NMaier.BlockStream.Tests
@@ -7,39 +8,7 @@ namespace NMaier.BlockStream.Tests
   [TestClass]
   public sealed class TransformerTests
   {
-    [TestMethod]
-    public void AesBlock()
-    {
-      Test(new AESAndMACTransformer("ttest"));
-    }
-
-    [TestMethod]
-    public void ChaBlock()
-    {
-      Test(new ChaChaAndPolyTransformer("ttest"));
-    }
-
-    [TestMethod]
-    public void Composite()
-    {
-      Test(new CompositeTransformer(new NoneBlockTransformer(), new TestTransformer()));
-      Test(new CompositeTransformer(new NoneBlockTransformer(), new LZ4CompressorTransformer(),
-                                    new AESAndMACTransformer("comptest")));
-    }
-
-    [TestMethod]
-    public void LZ4Block()
-    {
-      Test(new LZ4CompressorTransformer());
-    }
-
-    [TestMethod]
-    public void NoneBlock()
-    {
-      Test(new NoneBlockTransformer());
-    }
-
-    private void Test(IBlockTransformer transformer)
+    private static void Test(IBlockTransformer transformer)
     {
       var buffer = Enumerable.Range(0, 128).Select(v => (byte)v).ToArray();
       var cmp = Enumerable.Range(0, 128).Select(v => (byte)v).ToArray();
@@ -52,6 +21,47 @@ namespace NMaier.BlockStream.Tests
       var back = new byte[buffer.Length * 2];
       var backspan = back.AsSpan(0, transformer.UntransformBlock(trans, back));
       Assert.IsTrue(backspan.SequenceEqual(cmp));
+    }
+
+    [TestMethod]
+    public void AesBlock()
+    {
+      Test(new AESAndMACTransformer("t-test Ä 漢族 / 汉族"));
+    }
+
+    [TestMethod]
+    public void ChaBlock()
+    {
+      Test(new ChaChaAndPolyTransformer("t-test Ä 漢族 / 汉族"));
+    }
+
+    [TestMethod]
+    public void ChecksumBlock()
+    {
+      Test(new ChecksumTransformer());
+    }
+
+    [TestMethod]
+    public void Composite()
+    {
+      Test(new CompositeTransformer(new NoneBlockTransformer(), new TestTransformer()));
+      Test(
+        new CompositeTransformer(
+          new NoneBlockTransformer(),
+          new LZ4CompressorTransformer(),
+          new AESAndMACTransformer("comp test")));
+    }
+
+    [TestMethod]
+    public void LZ4Block()
+    {
+      Test(new LZ4CompressorTransformer());
+    }
+
+    [TestMethod]
+    public void NoneBlock()
+    {
+      Test(new NoneBlockTransformer());
     }
 
     internal sealed class TestTransformer : IBlockTransformer

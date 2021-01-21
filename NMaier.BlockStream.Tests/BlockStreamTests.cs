@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
+
 using JetBrains.Annotations;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace NMaier.BlockStream.Tests
 {
   [TestClass]
-  [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
   public sealed class BlockStreamTests
   {
     private static void BlockStreamSequentialTestRunner(IBlockTransformer transformer)
@@ -20,31 +20,94 @@ namespace NMaier.BlockStream.Tests
       buf.AsSpan().Fill(0x03);
       using var ms = new KeepOpenMemoryStream();
       using (var writer = new SequentialBlockWriteOnceStream(ms, transformer)) {
+        Assert.IsTrue(writer.CanWrite);
+        Assert.IsFalse(writer.CanRead);
+        Assert.IsFalse(writer.CanSeek);
+        Assert.IsFalse(writer.CanTimeout);
         for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
           buf[i] = (byte)(i % byte.MaxValue);
           writer.Write(buf.AsSpan(0, i));
           writer.Flush(true);
         }
+
+        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
+          buf[i] = (byte)(i % byte.MaxValue);
+          writer.Write(buf, 0, i);
+          writer.Flush(true);
+        }
+
+        Assert.AreEqual(writer.Position, 19923020);
+
+        // ReSharper disable AccessToDisposedClosure
+        _ = Assert.ThrowsException<NotSupportedException>(() => writer.Seek(0, 0));
+        _ = Assert.ThrowsException<NotSupportedException>(() => writer.SetLength(0));
+        _ = Assert.ThrowsException<NotSupportedException>(() => writer.Read(new byte[1]));
+        _ = Assert.ThrowsException<NotSupportedException>(
+          () => writer.Read(new byte[1], 0, 1));
+        _ = Assert.ThrowsException<NotSupportedException>(() => writer.Position = 0);
+        _ = Assert.ThrowsException<NotSupportedException>(() => writer.Length);
+        // ReSharper restore AccessToDisposedClosure
       }
 
-      ms.Seek(0, SeekOrigin.Begin);
+      _ = ms.Seek(0, SeekOrigin.Begin);
       using (var reader = new SequentialBlockReadonlyStream(ms, transformer)) {
+        Assert.IsTrue(reader.CanRead);
+        Assert.IsFalse(reader.CanWrite);
+        Assert.IsFalse(reader.CanSeek);
+        Assert.IsFalse(reader.CanTimeout);
+        Assert.AreEqual(reader.Position, 0);
         for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
           outbuf.AsSpan(0, i).Clear();
           var read = reader.Read(outbuf.AsSpan(0, i));
           Assert.AreEqual(i, read);
           Assert.IsTrue(buf.AsSpan(0, i).SequenceEqual(outbuf.AsSpan(0, i)));
         }
+
+        for (var i = 0; i < buf.Length; i += (int)Math.Floor(buf.Length / 20.0) + 1) {
+          outbuf.AsSpan(0, i).Clear();
+          var read = reader.Read(outbuf, 0, i);
+          Assert.AreEqual(i, read);
+          Assert.IsTrue(buf.AsSpan(0, i).SequenceEqual(outbuf.AsSpan(0, i)));
+        }
+
+        Assert.AreEqual(reader.Position, 19923020);
+
+        // ReSharper disable AccessToDisposedClosure
+#if NETFRAMEWORK
+      _ =
+ Assert.ThrowsException<NotSupportedException>(() => reader.Write(new byte[1], 0, 1));
+#else
+        _ = Assert.ThrowsException<NotSupportedException>(
+          () => reader.Write(new byte[1]));
+#endif
+        _ = Assert.ThrowsException<NotSupportedException>(() => reader.Seek(0, 0));
+        _ = Assert.ThrowsException<NotSupportedException>(() => reader.SetLength(0));
+        _ = Assert.ThrowsException<NotSupportedException>(() => reader.Position = 0);
+        _ = Assert.ThrowsException<NotSupportedException>(() => reader.Length);
+        // ReSharper restore AccessToDisposedClosure
+      }
+
+      _ = ms.Seek(0, SeekOrigin.Begin);
+      using (var reader = new SequentialBlockReadonlyStream(ms, transformer)) {
+        reader.ReadFullBlock(new byte[10]);
+        reader.ReadFullBlock(new byte[10]);
+        reader.ReadFullBlock(new byte[10]);
+        Assert.AreEqual(reader.Position, 30);
       }
     }
 
-    private static void BlockStreamWriterOnceTest(IBlockTransformer transformer, IBlockCache cache)
+    private static void BlockStreamWriterOnceTest(IBlockTransformer transformer,
+      IBlockCache cache)
     {
       using var ms = new KeepOpenMemoryStream();
       const int COUNT = 100_000;
 
       long expectedLength;
-      using (var writer = new BlockWriteOnceStream(ms, transformer)) {
+      using (var writer = new BlockWriteOnceStream(ms, transformer, 512)) {
+        Assert.IsTrue(writer.CanWrite);
+        Assert.IsFalse(writer.CanRead);
+        Assert.IsFalse(writer.CanSeek);
+        Assert.IsFalse(writer.CanTimeout);
         using var binaryWriter = new BinaryWriter(writer, Encoding.ASCII, true);
         for (var i = 0; i < COUNT; ++i) {
           binaryWriter.Write(i);
@@ -54,19 +117,63 @@ namespace NMaier.BlockStream.Tests
         expectedLength = writer.Length;
       }
 
-      using (var writer = new BlockReadOnlyStream(ms, transformer, cache: cache)) {
-        Assert.AreEqual(expectedLength, writer.Length);
-        using var binaryReader = new BinaryReader(writer, Encoding.ASCII, true);
-        using var binaryCursorReader = new BinaryReader(writer.CreateCursor(), Encoding.ASCII, true);
-        for (var i = 0; i < COUNT; ++i) {
-          Assert.AreEqual(i, binaryReader.ReadInt32());
-          Assert.AreEqual(i, binaryCursorReader.ReadInt32());
-        }
+      File.WriteAllBytes("C:\\temp\\blocked.bin", ms.ToArray());
 
-        var buf = new byte[1 << 22];
-        Assert.AreEqual(buf.Length, writer.Read(buf));
-        Assert.IsTrue(buf.All(i => i == 0));
+      using var reader = new BlockReadOnlyStream(ms, transformer, 512, cache);
+      Assert.AreEqual(expectedLength, reader.Length);
+      Assert.IsTrue(reader.CanRead);
+      Assert.IsTrue(reader.CanSeek);
+      Assert.IsFalse(reader.CanWrite);
+      Assert.IsFalse(reader.CanTimeout);
+      Assert.AreEqual(reader.Position, 0);
+      _ = reader.Seek(0, SeekOrigin.End);
+      Assert.AreEqual(reader.Position, reader.Length);
+      _ = reader.Seek(-10, SeekOrigin.Current);
+      Assert.AreEqual(reader.Position, reader.Length - 10);
+      reader.Position -= 10;
+      Assert.AreEqual(reader.Position, reader.Length - 20);
+      _ = reader.Seek(0, SeekOrigin.Begin);
+      Assert.AreEqual(reader.Position, 0);
+
+
+      Assert.AreEqual(reader.Seek(0, SeekOrigin.End), reader.Length);
+      Assert.AreEqual(reader.Seek(-10, SeekOrigin.Current), reader.Length - 10);
+      Assert.AreEqual(reader.Seek(0, SeekOrigin.Begin), 0);
+
+      // ReSharper disable AccessToDisposedClosure
+      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+        () => reader.Seek(-10, SeekOrigin.Begin));
+      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+        () => reader.Seek(-10, SeekOrigin.Current));
+      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+        () => reader.Seek(-reader.Length - 10, SeekOrigin.End));
+      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+        () => reader.Seek(0, (SeekOrigin)(-1)));
+      // ReSharper restore AccessToDisposedClosure
+
+      // ReSharper disable AccessToDisposedClosure
+      _ = Assert.ThrowsException<NotSupportedException>(() => reader.SetLength(0));
+#if NETFRAMEWORK
+      _ =
+ Assert.ThrowsException<NotSupportedException>(() => reader.Write(new byte[1], 0, 1));
+#else
+      _ = Assert.ThrowsException<NotSupportedException>(() => reader.Write(new byte[1]));
+#endif
+      // ReSharper restore AccessToDisposedClosure
+
+      using var binaryReader = new BinaryReader(reader, Encoding.ASCII, true);
+      using var binaryCursorReader = new BinaryReader(
+        reader.CreateCursor(),
+        Encoding.ASCII,
+        true);
+      for (var i = 0; i < COUNT; ++i) {
+        Assert.AreEqual(i, binaryReader.ReadInt32());
+        Assert.AreEqual(i, binaryCursorReader.ReadInt32());
       }
+
+      var buf = new byte[1 << 22];
+      Assert.AreEqual(buf.Length, reader.Read(buf));
+      Assert.IsTrue(buf.All(i => i == 0));
     }
 
 
@@ -77,69 +184,111 @@ namespace NMaier.BlockStream.Tests
       BlockStreamSequentialTestRunner(transformer);
     }
 
-    private static void BlockStreamWriterSizeTestRunner(IBlockTransformer transformer, [CanBeNull] IBlockCache cache)
+    private static void BlockStreamWriterSizeTestRunner(IBlockTransformer transformer,
+      [CanBeNull] IBlockCache cache)
     {
       BlockStreamWriterOnceTest(transformer, cache);
 
       using var ms = new KeepOpenMemoryStream();
-      var items = 10_000;
+      const int ITEMS = 10_000;
       using (var writer = new BlockRandomAccessStream(ms, transformer, cache: cache)) {
+        Assert.IsTrue(writer.CanRead);
+        Assert.IsTrue(writer.CanSeek);
+        Assert.IsTrue(writer.CanWrite);
+        Assert.IsFalse(writer.CanTimeout);
+
         using (var binaryWriter = new BinaryWriter(writer, Encoding.ASCII, true)) {
-          for (var i = 0; i < items; ++i) {
+          for (var i = 0; i < ITEMS; ++i) {
             binaryWriter.Write(i);
           }
         }
 
+        writer.Flush();
+        writer.Flush(true);
+
         Assert.AreEqual(writer.Position, writer.Length);
-        writer.Seek(0, SeekOrigin.Begin);
+        _ = writer.Seek(0, SeekOrigin.Begin);
         Assert.AreEqual(writer.Position, 0);
-        Assert.AreEqual(writer.Length, sizeof(int) * items);
+        Assert.AreEqual(writer.Length, sizeof(int) * ITEMS);
 
         using var binaryReader = new BinaryReader(writer, Encoding.ASCII, true);
-        for (var i = 0; i < items; ++i) {
+        for (var i = 0; i < ITEMS; ++i) {
           Assert.AreEqual(i, binaryReader.ReadInt32());
         }
       }
 
       using (var writer = new BlockRandomAccessStream(ms, transformer, cache: cache)) {
         Assert.AreEqual(writer.Position, 0);
-        Assert.AreEqual(writer.Length, sizeof(int) * items);
+        Assert.AreEqual(writer.Length, sizeof(int) * ITEMS);
+
         using (var binaryReader = new BinaryReader(writer, Encoding.ASCII, true)) {
-          for (var i = 0; i < items; ++i) {
+          for (var i = 0; i < ITEMS; ++i) {
             Assert.AreEqual(i, binaryReader.ReadInt32());
           }
         }
 
         Assert.AreEqual(writer.Position, writer.Length);
-        Assert.AreEqual(writer.Length, sizeof(int) * items);
+        Assert.AreEqual(writer.Length, sizeof(int) * ITEMS);
 
         if (transformer.MayChangeSize) {
-          Assert.ThrowsException<IOException>(() => {
-            writer.Seek(sizeof(int), SeekOrigin.Begin);
+          void WriteSome()
+          {
+            // ReSharper disable AccessToDisposedClosure
+            _ = writer.Seek(sizeof(int), SeekOrigin.Begin);
             using var binaryWriter = new BinaryWriter(writer, Encoding.ASCII, true);
-            for (var i = 0; i < items; ++i) {
+            for (var i = 0; i < ITEMS; ++i) {
               binaryWriter.Write(i);
             }
-          });
+            // ReSharper restore AccessToDisposedClosure
+          }
+
+          _ = Assert.ThrowsException<IOException>(WriteSome);
           Assert.AreEqual(sizeof(int), writer.Position);
         }
 
-        writer.Seek(0, SeekOrigin.Begin);
+        _ = writer.Seek(0, SeekOrigin.Begin);
         Assert.AreEqual(writer.Position, 0);
-        Assert.AreEqual(writer.Length, sizeof(int) * items);
+        Assert.AreEqual(writer.Length, sizeof(int) * ITEMS);
 
         using (var binaryReader = new BinaryReader(writer, Encoding.ASCII, true)) {
-          for (var i = 0; i < items; ++i) {
+          for (var i = 0; i < ITEMS; ++i) {
             Assert.AreEqual(i, binaryReader.ReadInt32());
           }
         }
 
         Assert.AreEqual(writer.Position, writer.Length);
-        writer.Seek(-4, SeekOrigin.End);
+        _ = writer.Seek(-4, SeekOrigin.End);
         Assert.AreEqual(writer.Position + 4, writer.Length);
         Assert.AreEqual(4, writer.Read(new byte[5]));
         Assert.AreEqual(writer.Position, writer.Length);
         Assert.AreEqual(0, writer.Read(new byte[5]));
+
+        writer.SetLength(writer.Length + 10);
+        Assert.AreNotEqual(writer.Position, writer.Length);
+        var buffer = new byte[10];
+        Assert.AreEqual(10, writer.Read(buffer));
+        Assert.AreEqual(writer.Position, writer.Length);
+        Assert.IsTrue(buffer.All(b => b == 0));
+
+        Assert.AreEqual(writer.Seek(-5, SeekOrigin.End), writer.Length - 5);
+        Assert.AreEqual(5, writer.Read(buffer));
+        Assert.AreEqual(writer.Position, writer.Length);
+        Assert.IsTrue(buffer.All(b => b == 0));
+
+        Assert.AreEqual(writer.Seek(5, SeekOrigin.End), writer.Length + 5);
+        Assert.AreEqual(0, writer.Read(buffer));
+        Assert.AreEqual(writer.Position, writer.Length);
+        Assert.IsTrue(buffer.All(b => b == 0));
+
+
+        writer.SetLength(10);
+        Assert.AreEqual(writer.Length, 10);
+        Assert.AreEqual(writer.Position, 10);
+
+        writer.Position = 3;
+        writer.SetLength(5);
+        Assert.AreEqual(writer.Length, 5);
+        Assert.AreEqual(writer.Position, 3);
 
         writer.SetLength(0);
         Assert.AreEqual(writer.Length, 0);
@@ -171,36 +320,119 @@ namespace NMaier.BlockStream.Tests
     public void BlockStreamWriterComp2Test()
     {
       BlockStreamWriterSizeTestInternal(
-        new CompositeTransformer(new TransformerTests.TestTransformer(), new NoneBlockTransformer()));
-    }
-
-    [TestMethod]
-    public void BlockStreamWriterCompAesLZ4Test()
-    {
-      BlockStreamWriterSizeTestInternal(new CompositeTransformer(new NoneBlockTransformer(),
-                                                                 new AESAndMACTransformer("test3"),
-                                                                 new LZ4CompressorTransformer()));
+        new CompositeTransformer(
+          new TransformerTests.TestTransformer(),
+          new NoneBlockTransformer()));
     }
 
     [TestMethod]
     public void BlockStreamWriterCompLZ4ChaTest()
     {
-      BlockStreamWriterSizeTestInternal(new CompositeTransformer(new LZ4CompressorTransformer(),
-                                                                 new ChaChaAndPolyTransformer("test4"),
-                                                                 new NoneBlockTransformer()));
+      BlockStreamWriterSizeTestInternal(
+        new CompositeTransformer(
+          new LZ4CompressorTransformer(),
+          new ChaChaAndPolyTransformer("test4"),
+          new NoneBlockTransformer()));
     }
 
     [TestMethod]
     public void BlockStreamWriterCompTest()
     {
       BlockStreamWriterSizeTestInternal(
-        new CompositeTransformer(new NoneBlockTransformer(), new TransformerTests.TestTransformer()));
+        new CompositeTransformer(
+          new NoneBlockTransformer(),
+          new TransformerTests.TestTransformer()));
     }
 
     [TestMethod]
     public void BlockStreamWriterEncCompTest()
     {
       BlockStreamWriterSizeTestInternal(new EncryptedCompressedTransformer("test222"));
+    }
+
+    [TestMethod]
+    public void BlockStreamWriterFileTests()
+    {
+      const string TMP = "file.bin";
+      var trans = new Rot0Transformer();
+      using (var fs = new FileStream(TMP, FileMode.Create, FileAccess.ReadWrite))
+      using (var writer = new BlockWriteOnceStream(fs, trans)) {
+        for (var i = 0; i < 256; ++i) {
+          writer.WriteByte((byte)i);
+        }
+
+        writer.Flush(true);
+      }
+
+      using (var fs = new FileStream(TMP, FileMode.Open, FileAccess.ReadWrite))
+      using (var reader = new BlockReadOnlyStream(fs, trans)) {
+        for (var i = 0; i < 256; ++i) {
+          Assert.AreEqual((byte)i, reader.ReadByte());
+        }
+
+        reader.Flush();
+      }
+
+      using (var fs = new FileStream(TMP, FileMode.Open, FileAccess.ReadWrite))
+      using (var stream = new BlockRandomAccessStream(fs, trans)) {
+        for (var i = 0; i < 256; ++i) {
+          Assert.AreEqual((byte)i, stream.ReadByte());
+        }
+
+        _ = stream.Seek(0, SeekOrigin.Begin);
+
+        for (var i = 0; i < 256; ++i) {
+          stream.WriteByte((byte)i);
+        }
+
+        for (var i = 0; i < 256; ++i) {
+          stream.WriteByte((byte)i);
+        }
+
+        stream.Flush(true);
+      }
+
+      using (var fs = new FileStream(TMP, FileMode.Open, FileAccess.ReadWrite))
+      using (var stream = new BlockRandomAccessStream(fs, trans)) {
+        // ReSharper disable AccessToDisposedClosure
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => stream.Seek(-10, SeekOrigin.Begin));
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => stream.Seek(-10, SeekOrigin.Current));
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => stream.Seek(-stream.Length - 10, SeekOrigin.End));
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => stream.Seek(0, (SeekOrigin)(-1)));
+        // ReSharper restore AccessToDisposedClosure
+
+        Assert.AreEqual(stream.Seek(0, SeekOrigin.End), stream.Length);
+        Assert.AreEqual(stream.Seek(-10, SeekOrigin.Current), stream.Length - 10);
+        Assert.AreEqual(stream.Seek(0, SeekOrigin.Begin), 0);
+
+
+        for (var i = 0; i < 256; ++i) {
+          Assert.AreEqual((byte)i, stream.ReadByte());
+        }
+
+        for (var i = 0; i < 256; ++i) {
+          stream.WriteByte((byte)i);
+        }
+
+        stream.Flush(true);
+      }
+
+      using (var fs = new FileStream(TMP, FileMode.Open, FileAccess.ReadWrite))
+      using (var stream = new BlockRandomAccessStream(fs, trans)) {
+        for (var i = 0; i < 256; ++i) {
+          Assert.AreEqual((byte)i, stream.ReadByte());
+        }
+
+        for (var i = 0; i < 256; ++i) {
+          Assert.AreEqual((byte)i, stream.ReadByte());
+        }
+
+        stream.Flush(true);
+      }
     }
 
     [TestMethod]
@@ -223,7 +455,7 @@ namespace NMaier.BlockStream.Tests
         }
 
         Assert.AreEqual(writer.Position, writer.Length);
-        writer.Seek(0, SeekOrigin.Begin);
+        _ = writer.Seek(0, SeekOrigin.Begin);
         Assert.AreEqual(writer.Position, 0);
         Assert.AreEqual(writer.Length, sizeof(int) * COUNT);
 
@@ -242,7 +474,7 @@ namespace NMaier.BlockStream.Tests
           }
         }
 
-        writer.Seek(sizeof(int), SeekOrigin.Begin);
+        _ = writer.Seek(sizeof(int), SeekOrigin.Begin);
         using (var binaryWriter = new BinaryWriter(writer, Encoding.ASCII, true)) {
           for (var i = 0; i < COUNT; ++i) {
             binaryWriter.Write(i);
@@ -250,7 +482,7 @@ namespace NMaier.BlockStream.Tests
         }
 
         Assert.AreEqual(writer.Position, writer.Length);
-        writer.Seek(0, SeekOrigin.Begin);
+        _ = writer.Seek(0, SeekOrigin.Begin);
         Assert.AreEqual(writer.Position, 0);
         Assert.AreEqual(writer.Length, sizeof(int) * (COUNT + 1));
 
@@ -261,7 +493,7 @@ namespace NMaier.BlockStream.Tests
         }
 
         Assert.AreEqual(writer.Position, writer.Length);
-        writer.Seek(-4, SeekOrigin.End);
+        _ = writer.Seek(-4, SeekOrigin.End);
         Assert.AreEqual(writer.Position + 4, writer.Length);
         Assert.AreEqual(4, writer.Read(new byte[5]));
         Assert.AreEqual(writer.Position, writer.Length);
@@ -287,7 +519,7 @@ namespace NMaier.BlockStream.Tests
 
     private sealed class BlockCache : IBlockCache
     {
-      private readonly Dictionary<long, byte[]> items = new Dictionary<long, byte[]>();
+      private readonly Dictionary<long, byte[]> items = new();
 
       public void Cache(Span<byte> block, long offset)
       {
@@ -296,22 +528,46 @@ namespace NMaier.BlockStream.Tests
 
       public void Invalidate(long offset)
       {
-        items.Remove(offset);
+        _ = items.Remove(offset);
       }
 
       public bool TryReadBlock(Span<byte> block, long offset)
       {
-        if (items.TryGetValue(offset, out var b)) {
-          b.AsSpan(0, block.Length).CopyTo(block);
-          return true;
+        if (!items.TryGetValue(offset, out var b)) {
+          return false;
         }
 
-        return false;
+        b.AsSpan(0, block.Length).CopyTo(block);
+        return true;
       }
 
       public void Dispose()
       {
         items.Clear();
+      }
+    }
+
+    private sealed class Rot0Transformer : IBlockTransformer
+    {
+      public bool MayChangeSize => false;
+
+      public ReadOnlySpan<byte> TransformBlock(ReadOnlySpan<byte> block)
+      {
+        var rv = block.ToArray();
+        rv[0] = (byte)(256 - rv[0]);
+        return rv;
+      }
+
+      public int UntransformBlock(ReadOnlySpan<byte> input, Span<byte> block)
+      {
+        if (input.Overlaps(block, out var off) && off == 0) {
+          block[0] = (byte)(256 - block[0]);
+          return input.Length;
+        }
+
+        input.CopyTo(block);
+        block[0] = (byte)(256 - block[0]);
+        return input.Length;
       }
     }
   }

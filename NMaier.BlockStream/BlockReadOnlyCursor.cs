@@ -17,11 +17,13 @@ namespace NMaier.BlockStream
       this.stream = stream;
     }
 
-    public override bool CanRead => true;
+    public override bool CanRead => stream.CanRead;
 
-    public override bool CanSeek => true;
+    public override bool CanSeek => stream.CanSeek;
 
-    public override bool CanWrite => false;
+    public override bool CanTimeout => stream.CanTimeout;
+
+    public override bool CanWrite => stream.CanWrite;
 
     public override long Length => stream.Length;
 
@@ -56,7 +58,9 @@ namespace NMaier.BlockStream
 
         var bpos = currentPosition % stream.BlockSize;
         // Must not over-read
-        var rem = Math.Min(Math.Min(Length - currentPosition, stream.BlockSize - bpos), buffer.Length);
+        var rem = Math.Min(
+          Math.Min(Length - currentPosition, stream.BlockSize - bpos),
+          buffer.Length);
         if (rem == 0) {
           return read;
         }
@@ -77,27 +81,40 @@ namespace NMaier.BlockStream
       switch (origin) {
         case SeekOrigin.Begin:
           if (offset < 0) {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must be positive");
+            ThrowHelpers.ThrowArgumentOutOfRangeException(
+              nameof(offset),
+              offset,
+              "Offset must be positive");
           }
 
           currentPosition = offset;
           break;
         case SeekOrigin.Current:
           if (offset + currentPosition < 0) {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must result in a positive position");
+            ThrowHelpers.ThrowArgumentOutOfRangeException(
+              nameof(offset),
+              offset,
+              "Offset must result in a positive position");
           }
 
           currentPosition += offset;
           break;
         case SeekOrigin.End:
           if (offset + Length < 0) {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must result in a positive position");
+            ThrowHelpers.ThrowArgumentOutOfRangeException(
+              nameof(offset),
+              offset,
+              "Offset must result in a positive position");
           }
 
           currentPosition = Length + offset;
           break;
         default:
-          throw new ArgumentOutOfRangeException(nameof(origin), origin, null);
+          ThrowHelpers.ThrowArgumentOutOfRangeException(
+            nameof(origin),
+            origin,
+            "Invalid origin");
+          break;
       }
 
       return currentPosition;
@@ -114,7 +131,7 @@ namespace NMaier.BlockStream
       throw new NotSupportedException();
     }
 
-#if !NET48
+#if !NETFRAMEWORK
     public override void Write(ReadOnlySpan<byte> buffer)
     {
       throw new NotSupportedException();

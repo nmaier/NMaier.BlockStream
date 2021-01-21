@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+
 using JetBrains.Annotations;
 
 namespace NMaier.BlockStream
 {
   /// <summary>
   ///   Transforms data using AES-CTR and verifies data using a HMAC-SHA256.
+  ///   <remarks>This transformer is slow</remarks>
   /// </summary>
   [PublicAPI]
   public sealed class AESAndMACTransformer : IBlockTransformer
@@ -34,7 +35,8 @@ namespace NMaier.BlockStream
     public AESAndMACTransformer(byte[] key)
     {
       cryptoKey = key.DeriveKeyBytesReasonablySafeNotForStorage(24);
-      macKey = key.Concat(cryptoKey).ToArray().DeriveKeyBytesReasonablySafeNotForStorage(64);
+      macKey = key.Concat(cryptoKey).ToArray()
+        .DeriveKeyBytesReasonablySafeNotForStorage(64);
     }
 
     /// <inheritdoc />
@@ -61,7 +63,7 @@ namespace NMaier.BlockStream
       using var hmac = new HMACSHA256(macKey);
       var hash = hmac.ComputeHash(input.Slice(32).ToArray());
       if (!input.Slice(0, 32).SequenceEqual(hash)) {
-        throw new IOException("Invalid MAC");
+        ThrowHelpers.ThrowInvalidMAC();
       }
 
       using var aes = new AesCounterMode();
@@ -79,7 +81,12 @@ namespace NMaier.BlockStream
       public AesCounterMode(byte[]? counter = null)
       {
         this.counter = counter ?? new byte[16];
-        aes = new AesManaged { BlockSize = 128, Mode = CipherMode.ECB, Padding = PaddingMode.None, KeySize = 192 };
+        aes = new AesManaged {
+          BlockSize = 128,
+          Mode = CipherMode.ECB,
+          Padding = PaddingMode.None,
+          KeySize = 192
+        };
       }
 
       public override ICryptoTransform CreateDecryptor(byte[] rgbKey, byte[]? _)
@@ -108,9 +115,10 @@ namespace NMaier.BlockStream
         private readonly byte[] counter;
         private readonly ICryptoTransform counterEncryptor;
         private readonly SymmetricAlgorithm symmetricAlgorithm;
-        private readonly Queue<byte> xorMask = new Queue<byte>();
+        private readonly Queue<byte> xorMask = new();
 
-        public CounterModeCryptoTransform(SymmetricAlgorithm symmetricAlgorithm, byte[] key, byte[] counter)
+        public CounterModeCryptoTransform(SymmetricAlgorithm symmetricAlgorithm,
+          byte[] key, byte[] counter)
         {
           this.symmetricAlgorithm = symmetricAlgorithm;
           this.counter = counter;
@@ -123,8 +131,8 @@ namespace NMaier.BlockStream
         public int InputBlockSize => symmetricAlgorithm.BlockSize / 8;
         public int OutputBlockSize => symmetricAlgorithm.BlockSize / 8;
 
-        public int TransformBlock(byte[] inputBuffer, int inputOffset, int inputCount, byte[] outputBuffer,
-          int outputOffset)
+        public int TransformBlock(byte[] inputBuffer, int inputOffset, int inputCount,
+          byte[] outputBuffer, int outputOffset)
         {
           for (var i = 0; i < inputCount; i++) {
             if (NeedMoreXorMaskBytes()) {
@@ -138,10 +146,15 @@ namespace NMaier.BlockStream
           return inputCount;
         }
 
-        public byte[] TransformFinalBlock(byte[] inputBuffer, int inputOffset, int inputCount)
+        public byte[] TransformFinalBlock(byte[] inputBuffer, int inputOffset,
+          int inputCount)
         {
           var output = new byte[inputCount];
-          TransformBlock(inputBuffer, inputOffset, inputCount, output, 0);
+          if (TransformBlock(inputBuffer, inputOffset, inputCount, output, 0) !=
+              inputCount) {
+            ThrowHelpers.ThrowCorruptData();
+          }
+
           return output;
         }
 
@@ -153,7 +166,12 @@ namespace NMaier.BlockStream
         {
           var counterModeBlock = new byte[symmetricAlgorithm.BlockSize / 8];
 
-          counterEncryptor.TransformBlock(counter, 0, counter.Length, counterModeBlock, 0);
+          _ = counterEncryptor.TransformBlock(
+            counter,
+            0,
+            counter.Length,
+            counterModeBlock,
+            0);
           IncrementCounter();
 
           foreach (var b in counterModeBlock) {
