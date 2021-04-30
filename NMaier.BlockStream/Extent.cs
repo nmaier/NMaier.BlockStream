@@ -6,6 +6,7 @@ namespace NMaier.BlockStream
 {
   [PublicAPI]
   [DebuggerDisplay("Ext: {Offset} {Length}")]
+#if NETFRAMEWORK || NETSTANDARD
   public readonly struct Extent
   {
     public readonly long Offset;
@@ -17,4 +18,7 @@ namespace NMaier.BlockStream
       Length = length;
     }
   }
+#else
+  public sealed record Extent(long Offset, short Length);
+#endif
 }
