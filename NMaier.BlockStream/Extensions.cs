@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
 using JetBrains.Annotations;
-
 #if NETFRAMEWORK
 using System.Buffers;
 
