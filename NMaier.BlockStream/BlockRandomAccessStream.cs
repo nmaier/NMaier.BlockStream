@@ -40,11 +40,13 @@ namespace NMaier.BlockStream
     /// </remarks>
     /// <param name="wrappedStream">Stream to be wrapped</param>
     /// <param name="blockSize">Block size to use</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
     /// <param name="cache">Optional block cache</param>
-    public BlockRandomAccessStream(Stream wrappedStream, short blockSize = BLOCK_SIZE,
-      IBlockCache? cache = null) : this(
+    public BlockRandomAccessStream(Stream wrappedStream, bool leaveOpen = false,
+      short blockSize = BLOCK_SIZE, IBlockCache? cache = null) : this(
       wrappedStream,
       new NoneBlockTransformer(),
+      leaveOpen,
       blockSize,
       cache)
     {
@@ -68,14 +70,12 @@ namespace NMaier.BlockStream
     /// </remarks>
     /// <param name="wrappedStream">Stream to be wrapped</param>
     /// <param name="transformer">Block transformer to use</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
     /// <param name="blockSize">Block size to use</param>
     /// <param name="cache">Optional block cache</param>
     public BlockRandomAccessStream(Stream wrappedStream, IBlockTransformer transformer,
-      short blockSize = BLOCK_SIZE, IBlockCache? cache = null) : base(
-      wrappedStream,
-      transformer,
-      blockSize,
-      cache)
+      bool leaveOpen = false, short blockSize = BLOCK_SIZE, IBlockCache? cache = null) :
+      base(wrappedStream, transformer, leaveOpen, blockSize, cache)
     {
       if (!wrappedStream.CanSeek) {
         throw new ArgumentException("Streams must be seekable", nameof(wrappedStream));

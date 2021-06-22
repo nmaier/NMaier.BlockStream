@@ -20,9 +20,10 @@ namespace NMaier.BlockStream
     protected long CurrentFooterLength;
     protected long CurrentLength;
     protected long CurrentPosition;
+    private readonly bool leaveOpen;
 
     protected BlockStream(Stream wrappedStream, IBlockTransformer transformer,
-      short blockSize = BLOCK_SIZE, IBlockCache? cache = null)
+      bool leaveOpen, short blockSize = BLOCK_SIZE, IBlockCache? cache = null)
     {
       if (blockSize is < 512 or > 28671) {
         ThrowHelpers.ThrowArgumentOutOfRangeException(
@@ -33,6 +34,7 @@ namespace NMaier.BlockStream
 
       WrappedStream = wrappedStream;
       Transformer = transformer;
+      this.leaveOpen = leaveOpen;
       BlockSize = blockSize;
       Cache = cache;
     }
@@ -42,7 +44,10 @@ namespace NMaier.BlockStream
       Flush();
       Extents.Clear();
       Cache?.Dispose();
-      WrappedStream.Dispose();
+
+      if (!leaveOpen) {
+        WrappedStream.Dispose();
+      }
 
       base.Dispose(disposing);
     }

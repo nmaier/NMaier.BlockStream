@@ -11,12 +11,11 @@ namespace NMaier.BlockStream
     private byte[] currentBlock = ArrayPool<byte>.Shared.Rent(short.MaxValue);
     private long currentIndex = -1;
     private long currentPosition;
-    private readonly long length;
 
     internal BlockReadOnlyCursor(BlockReadOnlyStream stream)
     {
       this.stream = stream;
-      length = stream.Length;
+      Length = stream.Length;
     }
 
     public override bool CanRead => stream.CanRead;
@@ -27,7 +26,7 @@ namespace NMaier.BlockStream
 
     public override bool CanWrite => stream.CanWrite;
 
-    public override long Length => length;
+    public override long Length { get; }
 
     public override long Position
     {
@@ -61,7 +60,7 @@ namespace NMaier.BlockStream
         var bpos = currentPosition % stream.BlockSize;
         // Must not over-read
         var rem = Math.Min(
-          Math.Min(length - currentPosition, stream.BlockSize - bpos),
+          Math.Min(Length - currentPosition, stream.BlockSize - bpos),
           buffer.Length);
         if (rem == 0) {
           return read;
@@ -102,14 +101,14 @@ namespace NMaier.BlockStream
           currentPosition += offset;
           break;
         case SeekOrigin.End:
-          if (offset + length < 0) {
+          if (offset + Length < 0) {
             ThrowHelpers.ThrowArgumentOutOfRangeException(
               nameof(offset),
               offset,
               "Offset must result in a positive position");
           }
 
-          currentPosition = length + offset;
+          currentPosition = Length + offset;
           break;
         default:
           ThrowHelpers.ThrowArgumentOutOfRangeException(

@@ -34,11 +34,8 @@ namespace NMaier.BlockStream
     }
 
     public BlockReadOnlyStream(Stream wrappedStream, IBlockTransformer transformer,
-      short blockSize = BLOCK_SIZE, IBlockCache? cache = null) : base(
-      wrappedStream,
-      transformer,
-      blockSize,
-      cache)
+      bool leaveOpen = false, short blockSize = BLOCK_SIZE, IBlockCache? cache = null) :
+      base(wrappedStream, transformer, leaveOpen, blockSize, cache)
     {
       if (!wrappedStream.CanSeek) {
         throw new ArgumentException("Streams must be seekable", nameof(wrappedStream));

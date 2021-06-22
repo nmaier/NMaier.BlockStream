@@ -94,6 +94,29 @@ namespace NMaier.BlockStream.Tests
         reader.ReadFullBlock(new byte[10]);
         Assert.AreEqual(reader.Position, 30);
       }
+
+      using var ms2 = new MemoryStream();
+      using (var writer =
+        new SequentialBlockWriteOnceStream(ms2, transformer, leaveOpen: true)) {
+        writer.Write(
+          new byte[] {
+            0x1,
+            0xff
+          });
+      }
+
+      ms2.Seek(0, SeekOrigin.Begin);
+      using (var reader =
+        new SequentialBlockReadonlyStream(ms2, transformer, leaveOpen: true)) {
+        Span<byte> actual = stackalloc byte[2];
+        reader.ReadFullBlock(actual);
+        Assert.IsTrue(
+          actual.SequenceEqual(
+            new byte[] {
+              0x1,
+              0xff
+            }));
+      }
     }
 
     private static void BlockStreamWriterOnceTest(IBlockTransformer transformer,
@@ -103,7 +126,7 @@ namespace NMaier.BlockStream.Tests
       const int COUNT = 100_000;
 
       long expectedLength;
-      using (var writer = new BlockWriteOnceStream(ms, transformer, 512)) {
+      using (var writer = new BlockWriteOnceStream(ms, transformer, blockSize: 512)) {
         Assert.IsTrue(writer.CanWrite);
         Assert.IsFalse(writer.CanRead);
         Assert.IsFalse(writer.CanSeek);
@@ -119,7 +142,11 @@ namespace NMaier.BlockStream.Tests
 
       File.WriteAllBytes("C:\\temp\\blocked.bin", ms.ToArray());
 
-      using var reader = new BlockReadOnlyStream(ms, transformer, 512, cache);
+      using var reader = new BlockReadOnlyStream(
+        ms,
+        transformer,
+        blockSize: 512,
+        cache: cache);
       Assert.AreEqual(expectedLength, reader.Length);
       Assert.IsTrue(reader.CanRead);
       Assert.IsTrue(reader.CanSeek);
@@ -174,6 +201,37 @@ namespace NMaier.BlockStream.Tests
       var buf = new byte[1 << 22];
       Assert.AreEqual(buf.Length, reader.Read(buf));
       Assert.IsTrue(buf.All(i => i == 0));
+
+      using var ms2 = new MemoryStream();
+      using (var writer2 = new BlockWriteOnceStream(
+        ms2,
+        transformer,
+        leaveOpen: true,
+        blockSize: 512)) {
+        writer2.Write(
+          new byte[] {
+            0x1,
+            0xff
+          });
+      }
+
+      ms2.Seek(0, SeekOrigin.Begin);
+      using (var reader2 = new BlockReadOnlyStream(
+        ms2,
+        transformer,
+        leaveOpen: true,
+        blockSize: 512)) {
+        Span<byte> actual = stackalloc byte[2];
+        reader2.ReadFullBlock(actual);
+        Assert.IsTrue(
+          actual.SequenceEqual(
+            new byte[] {
+              0x1,
+              0xff
+            }));
+      }
+
+      Assert.AreNotEqual(0, ms2.Position);
     }
 
 
@@ -296,6 +354,37 @@ namespace NMaier.BlockStream.Tests
 
         writer.Flush(true);
       }
+
+      using var ms2 = new MemoryStream();
+      using (var writer2 = new BlockRandomAccessStream(
+        ms2,
+        transformer,
+        leaveOpen: true,
+        blockSize: 512)) {
+        writer2.Write(
+          new byte[] {
+            0x1,
+            0xff
+          });
+      }
+
+      _ = ms2.Seek(0, SeekOrigin.Begin);
+      using (var reader2 = new BlockRandomAccessStream(
+        ms2,
+        transformer,
+        leaveOpen: true,
+        blockSize: 512)) {
+        Span<byte> actual = stackalloc byte[2];
+        reader2.ReadFullBlock(actual);
+        Assert.IsTrue(
+          actual.SequenceEqual(
+            new byte[] {
+              0x1,
+              0xff
+            }));
+      }
+
+      Assert.AreNotEqual(0, ms2.Position);
     }
 
     [TestMethod]

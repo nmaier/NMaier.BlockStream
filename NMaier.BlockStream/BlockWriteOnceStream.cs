@@ -23,9 +23,14 @@ namespace NMaier.BlockStream
     /// </summary>
     /// <remarks>The wrapped stream must be writable and seekable</remarks>
     /// <param name="wrappedStream">Stream to wrap</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
     /// <param name="blockSize">Block size to use</param>
-    public BlockWriteOnceStream(Stream wrappedStream, short blockSize = BLOCK_SIZE) :
-      this(wrappedStream, new NoneBlockTransformer(), blockSize)
+    public BlockWriteOnceStream(Stream wrappedStream, bool leaveOpen = false,
+      short blockSize = BLOCK_SIZE) : this(
+      wrappedStream,
+      new NoneBlockTransformer(),
+      leaveOpen,
+      blockSize)
     {
     }
 
@@ -35,9 +40,14 @@ namespace NMaier.BlockStream
     /// <remarks>The wrapped stream must be writable and seekable</remarks>
     /// <param name="wrappedStream">Stream to wrap</param>
     /// <param name="transformer">The block transformer to use</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
     /// <param name="blockSize">Block size to use</param>
     public BlockWriteOnceStream(Stream wrappedStream, IBlockTransformer transformer,
-      short blockSize = BLOCK_SIZE) : base(wrappedStream, transformer, blockSize)
+      bool leaveOpen = false, short blockSize = BLOCK_SIZE) : base(
+      wrappedStream,
+      transformer,
+      leaveOpen,
+      blockSize)
     {
       currentBlock = new byte[BlockSize];
       _ = WrappedStream.Seek(0, SeekOrigin.Begin);

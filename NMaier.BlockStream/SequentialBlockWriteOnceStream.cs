@@ -25,11 +25,14 @@ namespace NMaier.BlockStream
     /// </summary>
     /// <param name="wrappedStream">Stream to wrap</param>
     /// <param name="transformer">Block transformer to use</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
     /// <param name="blockSize">Block size to use</param>
     public SequentialBlockWriteOnceStream([NotNull] Stream wrappedStream,
-      [NotNull] IBlockTransformer transformer, short blockSize = BLOCK_SIZE) : base(
+      [NotNull] IBlockTransformer transformer, bool leaveOpen = false,
+      short blockSize = BLOCK_SIZE) : base(
       wrappedStream,
       transformer,
+      leaveOpen,
       blockSize)
     {
     }

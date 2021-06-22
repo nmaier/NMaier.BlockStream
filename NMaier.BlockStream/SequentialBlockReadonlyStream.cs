@@ -21,11 +21,9 @@ namespace NMaier.BlockStream
     private short pos;
 
 
-    public SequentialBlockReadonlyStream([NotNull] Stream wrappedStream,
-      [NotNull] IBlockTransformer transformer, short blockSize = BLOCK_SIZE) : base(
-      wrappedStream,
-      transformer,
-      blockSize)
+    public SequentialBlockReadonlyStream(Stream wrappedStream,
+      IBlockTransformer transformer, bool leaveOpen = false, short blockSize = BLOCK_SIZE)
+      : base(wrappedStream, transformer, leaveOpen, blockSize)
     {
       if (!wrappedStream.CanRead) {
         throw new ArgumentException("Streams must be readable", nameof(wrappedStream));
