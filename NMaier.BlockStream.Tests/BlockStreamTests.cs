@@ -50,7 +50,7 @@ namespace NMaier.BlockStream.Tests
       }
 
       _ = ms.Seek(0, SeekOrigin.Begin);
-      using (var reader = new SequentialBlockReadonlyStream(ms, transformer)) {
+      using (var reader = new SequentialBlockReadOnlyStream(ms, transformer)) {
         Assert.IsTrue(reader.CanRead);
         Assert.IsFalse(reader.CanWrite);
         Assert.IsFalse(reader.CanSeek);
@@ -88,7 +88,7 @@ namespace NMaier.BlockStream.Tests
       }
 
       _ = ms.Seek(0, SeekOrigin.Begin);
-      using (var reader = new SequentialBlockReadonlyStream(ms, transformer)) {
+      using (var reader = new SequentialBlockReadOnlyStream(ms, transformer)) {
         reader.ReadFullBlock(new byte[10]);
         reader.ReadFullBlock(new byte[10]);
         reader.ReadFullBlock(new byte[10]);
@@ -107,7 +107,7 @@ namespace NMaier.BlockStream.Tests
 
       ms2.Seek(0, SeekOrigin.Begin);
       using (var reader =
-        new SequentialBlockReadonlyStream(ms2, transformer, leaveOpen: true)) {
+        new SequentialBlockReadOnlyStream(ms2, transformer, leaveOpen: true)) {
         Span<byte> actual = stackalloc byte[2];
         reader.ReadFullBlock(actual);
         Assert.IsTrue(

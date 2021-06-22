@@ -14,14 +14,14 @@ namespace NMaier.BlockStream
   /// </summary>
   /// <remarks>Compatible with output produced by <see cref="SequentialBlockWriteOnceStream" /></remarks>
   [PublicAPI]
-  public sealed class SequentialBlockReadonlyStream : BlockStream
+  public sealed class SequentialBlockReadOnlyStream : BlockStream
   {
     private byte[] currentBlock = ArrayPool<byte>.Shared.Rent(short.MaxValue);
     private short fill;
     private short pos;
 
 
-    public SequentialBlockReadonlyStream(Stream wrappedStream,
+    public SequentialBlockReadOnlyStream(Stream wrappedStream,
       IBlockTransformer transformer, bool leaveOpen = false, short blockSize = BLOCK_SIZE)
       : base(wrappedStream, transformer, leaveOpen, blockSize)
     {

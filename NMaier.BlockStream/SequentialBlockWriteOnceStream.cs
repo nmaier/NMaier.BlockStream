@@ -12,7 +12,7 @@ namespace NMaier.BlockStream
   ///   A sequential writer block stream. This kind of stream is not seekable, however it has more lax requirements for
   ///   blocks.
   /// </summary>
-  /// <remarks>Output must be consumed with <see cref="SequentialBlockReadonlyStream" /></remarks>
+  /// <remarks>Output must be consumed with <see cref="SequentialBlockReadOnlyStream" /></remarks>
   [PublicAPI]
   public sealed class SequentialBlockWriteOnceStream : BlockStream
   {
