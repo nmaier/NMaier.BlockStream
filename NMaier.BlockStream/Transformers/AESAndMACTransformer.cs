@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -73,7 +72,7 @@ namespace NMaier.BlockStream
       return dec.Length;
     }
 
-    internal sealed class AesCounterMode : SymmetricAlgorithm
+    private sealed class AesCounterMode : SymmetricAlgorithm
     {
       private readonly AesManaged aes;
       private readonly byte[] counter;
@@ -108,90 +107,74 @@ namespace NMaier.BlockStream
       {
         aes.GenerateKey();
       }
+    }
 
-      private sealed class CounterModeCryptoTransform : ICryptoTransform
+    private sealed class CounterModeCryptoTransform : ICryptoTransform
+    {
+      private static readonly byte[] rgbIV = new byte[16];
+      private readonly byte[] counter;
+      private readonly ICryptoTransform counterEncryptor;
+      private readonly byte[] maskBuffer;
+      private int maskAvail;
+
+      public CounterModeCryptoTransform(SymmetricAlgorithm symmetricAlgorithm, byte[] key,
+        byte[] counter)
       {
-        private static readonly byte[] rgbIV = new byte[16];
-        private readonly byte[] counter;
-        private readonly ICryptoTransform counterEncryptor;
-        private readonly SymmetricAlgorithm symmetricAlgorithm;
-        private readonly Queue<byte> xorMask = new();
+        this.counter = counter;
+        counterEncryptor = symmetricAlgorithm.CreateEncryptor(key, rgbIV);
+        InputBlockSize = symmetricAlgorithm.BlockSize / 8;
+        maskBuffer = new byte[InputBlockSize];
+        maskAvail = 0;
+      }
 
-        public CounterModeCryptoTransform(SymmetricAlgorithm symmetricAlgorithm,
-          byte[] key, byte[] counter)
-        {
-          this.symmetricAlgorithm = symmetricAlgorithm;
-          this.counter = counter;
-          counterEncryptor = symmetricAlgorithm.CreateEncryptor(key, rgbIV);
-        }
+      public bool CanReuseTransform => false;
+      public bool CanTransformMultipleBlocks => true;
 
-        public bool CanReuseTransform => false;
-        public bool CanTransformMultipleBlocks => true;
+      public int InputBlockSize { get; }
+      public int OutputBlockSize => InputBlockSize;
 
-        public int InputBlockSize => symmetricAlgorithm.BlockSize / 8;
-        public int OutputBlockSize => symmetricAlgorithm.BlockSize / 8;
-
-        public int TransformBlock(byte[] inputBuffer, int inputOffset, int inputCount,
-          byte[] outputBuffer, int outputOffset)
-        {
-          for (var i = 0; i < inputCount; i++) {
-            if (NeedMoreXorMaskBytes()) {
-              EncryptCounterThenIncrement();
-            }
-
-            var mask = xorMask.Dequeue();
-            outputBuffer[outputOffset + i] = (byte)(inputBuffer[inputOffset + i] ^ mask);
+      public int TransformBlock(byte[] inputBuffer, int inputOffset, int inputCount,
+        byte[] outputBuffer, int outputOffset)
+      {
+        for (var i = 0; i < inputCount; i++) {
+          if (maskAvail == 0) {
+            EncryptCounterThenIncrement();
           }
 
-          return inputCount;
+          var maskByte = maskBuffer[maskBuffer.Length - maskAvail--];
+          outputBuffer[outputOffset + i] =
+            (byte)(inputBuffer[inputOffset + i] ^ maskByte);
         }
 
-        public byte[] TransformFinalBlock(byte[] inputBuffer, int inputOffset,
-          int inputCount)
-        {
-          var output = new byte[inputCount];
-          if (TransformBlock(inputBuffer, inputOffset, inputCount, output, 0) !=
-              inputCount) {
-            ThrowHelpers.ThrowCorruptData();
-          }
+        return inputCount;
+      }
 
-          return output;
+      public byte[] TransformFinalBlock(byte[] inputBuffer, int inputOffset,
+        int inputCount)
+      {
+        var output = new byte[inputCount];
+        if (TransformBlock(inputBuffer, inputOffset, inputCount, output, 0) !=
+            inputCount) {
+          ThrowHelpers.ThrowCorruptData();
         }
 
-        public void Dispose()
-        {
-        }
+        return output;
+      }
 
-        private void EncryptCounterThenIncrement()
-        {
-          var counterModeBlock = new byte[symmetricAlgorithm.BlockSize / 8];
+      public void Dispose()
+      {
+      }
 
-          _ = counterEncryptor.TransformBlock(
-            counter,
-            0,
-            counter.Length,
-            counterModeBlock,
-            0);
-          IncrementCounter();
-
-          foreach (var b in counterModeBlock) {
-            xorMask.Enqueue(b);
+      private void EncryptCounterThenIncrement()
+      {
+        _ = counterEncryptor.TransformBlock(counter, 0, counter.Length, maskBuffer, 0);
+        for (var i = counter.Length - 1; i >= 0; i--) {
+          if (++counter[i] != 0) {
+            break;
           }
         }
 
-        private void IncrementCounter()
-        {
-          for (var i = counter.Length - 1; i >= 0; i--) {
-            if (++counter[i] != 0) {
-              break;
-            }
-          }
-        }
-
-        private bool NeedMoreXorMaskBytes()
-        {
-          return xorMask.Count == 0;
-        }
+        maskAvail = maskBuffer.Length;
       }
     }
   }
