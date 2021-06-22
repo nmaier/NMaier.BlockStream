@@ -134,6 +134,7 @@ namespace NMaier.BlockStream
 #endif
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5379:Ensure Key Derivation Function algorithm is sufficiently strong", Justification = "<Pending>")]
     internal static byte[] DeriveKeyBytesReasonablySafeNotForStorage(
       this byte[] passphrase, int length)
     {

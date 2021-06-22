@@ -116,6 +116,7 @@ namespace NMaier.BlockStream
       private readonly ICryptoTransform counterEncryptor;
       private readonly byte[] maskBuffer;
       private int maskAvail;
+      private readonly int counterLength;
 
       public CounterModeCryptoTransform(SymmetricAlgorithm symmetricAlgorithm, byte[] key,
         byte[] counter)
@@ -125,6 +126,7 @@ namespace NMaier.BlockStream
         InputBlockSize = symmetricAlgorithm.BlockSize / 8;
         maskBuffer = new byte[InputBlockSize];
         maskAvail = 0;
+        counterLength = this.counter.Length;
       }
 
       public bool CanReuseTransform => false;
@@ -167,8 +169,8 @@ namespace NMaier.BlockStream
 
       private void EncryptCounterThenIncrement()
       {
-        _ = counterEncryptor.TransformBlock(counter, 0, counter.Length, maskBuffer, 0);
-        for (var i = counter.Length - 1; i >= 0; i--) {
+        _ = counterEncryptor.TransformBlock(counter, 0, counterLength, maskBuffer, 0);
+        for (var i = counterLength - 1; i >= 0; i--) {
           if (++counter[i] != 0) {
             break;
           }

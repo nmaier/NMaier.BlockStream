@@ -21,6 +21,7 @@ namespace NMaier.BlockStream
     "CodeQuality",
     "IDE0079:Remove unnecessary suppression",
     Justification = "compat")]
+  [SuppressMessage("ReSharper", "ReplaceSliceWithRangeIndexer")]
   public sealed class ChaChaAndPolyTransformer : IBlockTransformer
   {
     private const int NONCE_LENGTH = 12;
@@ -61,6 +62,7 @@ namespace NMaier.BlockStream
     {
     }
 
+
     /// <summary>
     ///   Create a new transformer given the specified key.
     /// </summary>
@@ -69,6 +71,10 @@ namespace NMaier.BlockStream
     ///   MAC
     /// </remarks>
     /// <param name="key">Key to use</param>
+    [SuppressMessage(
+      "Security",
+      "CA5379:Ensure Key Derivation Function algorithm is sufficiently strong",
+      Justification = "<Pending>")]
     public ChaChaAndPolyTransformer(byte[] key)
     {
       // This is essentially OK. We never store the pass phrase or the derived key ourselves.
@@ -175,20 +181,10 @@ namespace NMaier.BlockStream
         return;
       }
 
-      var r0 = polyr0;
-      var r1 = polyr1;
-      var r2 = polyr2;
-      var r3 = polyr3;
-      var r4 = polyr4;
-      var s1 = r1 * 5;
-      var s2 = r2 * 5;
-      var s3 = r3 * 5;
-      var s4 = r4 * 5;
-
-      var pad0 = polys0;
-      var pad1 = polys1;
-      var pad2 = polys2;
-      var pad3 = polys3;
+      var s1 = polyr1 * 5;
+      var s2 = polyr2 * 5;
+      var s3 = polyr3 * 5;
+      var s4 = polyr4 * 5;
 
       var h0 = 0U;
       var h1 = 0U;
@@ -220,16 +216,16 @@ namespace NMaier.BlockStream
                         (buffer[off + 14] << 16) | (buffer[off + 15] << 24)) >> 8) |
                 (1U << 24);
 
-          d0 = ((ulong)h0 * r0) + ((ulong)h1 * s4) + ((ulong)h2 * s3) + ((ulong)h3 * s2) +
-               ((ulong)h4 * s1);
-          d1 = ((ulong)h0 * r1) + ((ulong)h1 * r0) + ((ulong)h2 * s4) + ((ulong)h3 * s3) +
-               ((ulong)h4 * s2);
-          d2 = ((ulong)h0 * r2) + ((ulong)h1 * r1) + ((ulong)h2 * r0) + ((ulong)h3 * s4) +
-               ((ulong)h4 * s3);
-          d3 = ((ulong)h0 * r3) + ((ulong)h1 * r2) + ((ulong)h2 * r1) + ((ulong)h3 * r0) +
-               ((ulong)h4 * s4);
-          d4 = ((ulong)h0 * r4) + ((ulong)h1 * r3) + ((ulong)h2 * r2) + ((ulong)h3 * r1) +
-               ((ulong)h4 * r0);
+          d0 = ((ulong)h0 * polyr0) + ((ulong)h1 * s4) + ((ulong)h2 * s3) +
+               ((ulong)h3 * s2) + ((ulong)h4 * s1);
+          d1 = ((ulong)h0 * polyr1) + ((ulong)h1 * polyr0) + ((ulong)h2 * s4) +
+               ((ulong)h3 * s3) + ((ulong)h4 * s2);
+          d2 = ((ulong)h0 * polyr2) + ((ulong)h1 * polyr1) + ((ulong)h2 * polyr0) +
+               ((ulong)h3 * s4) + ((ulong)h4 * s3);
+          d3 = ((ulong)h0 * polyr3) + ((ulong)h1 * polyr2) + ((ulong)h2 * polyr1) +
+               ((ulong)h3 * polyr0) + ((ulong)h4 * s4);
+          d4 = ((ulong)h0 * polyr4) + ((ulong)h1 * polyr3) + ((ulong)h2 * polyr2) +
+               ((ulong)h3 * polyr1) + ((ulong)h4 * polyr0);
 
           c = (uint)(d0 >> 26);
           h0 = (uint)d0 & 0x3ffffff;
@@ -258,14 +254,6 @@ namespace NMaier.BlockStream
       const uint STATE1 = 0x3320646e;
       const uint STATE2 = 0x79622d32;
       const uint STATE3 = 0x6b206574;
-      var state4 = cstate04;
-      var state5 = cstate05;
-      var state6 = cstate06;
-      var state7 = cstate07;
-      var state8 = cstate08;
-      var state9 = cstate09;
-      var state10 = cstate10;
-      var state11 = cstate11;
 
       var counter = 1U;
       var n0 = (uint)(nonce[0] | (nonce[1] << 8) | (nonce[2] << 16) | (nonce[3] << 24));
@@ -278,14 +266,14 @@ namespace NMaier.BlockStream
           var x1 = STATE1;
           var x2 = STATE2;
           var x3 = STATE3;
-          var x4 = state4;
-          var x5 = state5;
-          var x6 = state6;
-          var x7 = state7;
-          var x8 = state8;
-          var x9 = state9;
-          var x10 = state10;
-          var x11 = state11;
+          var x4 = cstate04;
+          var x5 = cstate05;
+          var x6 = cstate06;
+          var x7 = cstate07;
+          var x8 = cstate08;
+          var x9 = cstate09;
+          var x10 = cstate10;
+          var x11 = cstate11;
           var x12 = counter;
           var x13 = n0;
           var x14 = n1;
@@ -393,14 +381,14 @@ namespace NMaier.BlockStream
           tmpValues[1] = x1 + STATE1;
           tmpValues[2] = x2 + STATE2;
           tmpValues[3] = x3 + STATE3;
-          tmpValues[4] = x4 + state4;
-          tmpValues[5] = x5 + state5;
-          tmpValues[6] = x6 + state6;
-          tmpValues[7] = x7 + state7;
-          tmpValues[8] = x8 + state8;
-          tmpValues[9] = x9 + state9;
-          tmpValues[10] = x10 + state10;
-          tmpValues[11] = x11 + state11;
+          tmpValues[4] = x4 + cstate04;
+          tmpValues[5] = x5 + cstate05;
+          tmpValues[6] = x6 + cstate06;
+          tmpValues[7] = x7 + cstate07;
+          tmpValues[8] = x8 + cstate08;
+          tmpValues[9] = x9 + cstate09;
+          tmpValues[10] = x10 + cstate10;
+          tmpValues[11] = x11 + cstate11;
           tmpValues[12] = x12 + counter;
           tmpValues[13] = x13 + n0;
           tmpValues[14] = x14 + n1;
@@ -419,7 +407,8 @@ namespace NMaier.BlockStream
           }
 
           var slice = bytes.Slice(l);
-          for (var i = 0; i < Math.Min(slice.Length, 64); ++i) {
+          var sliceLength = Math.Min(slice.Length, 64);
+          for (var i = 0; i < sliceLength; ++i) {
             slice[i] = (byte)(slice[i] ^ tmp[i]);
           }
 
@@ -439,16 +428,16 @@ namespace NMaier.BlockStream
 
       h0 += 1;
 
-      d0 = ((ulong)h0 * r0) + ((ulong)h1 * s4) + ((ulong)h2 * s3) + ((ulong)h3 * s2) +
+      d0 = ((ulong)h0 * polyr0) + ((ulong)h1 * s4) + ((ulong)h2 * s3) + ((ulong)h3 * s2) +
            ((ulong)h4 * s1);
-      d1 = ((ulong)h0 * r1) + ((ulong)h1 * r0) + ((ulong)h2 * s4) + ((ulong)h3 * s3) +
-           ((ulong)h4 * s2);
-      d2 = ((ulong)h0 * r2) + ((ulong)h1 * r1) + ((ulong)h2 * r0) + ((ulong)h3 * s4) +
-           ((ulong)h4 * s3);
-      d3 = ((ulong)h0 * r3) + ((ulong)h1 * r2) + ((ulong)h2 * r1) + ((ulong)h3 * r0) +
-           ((ulong)h4 * s4);
-      d4 = ((ulong)h0 * r4) + ((ulong)h1 * r3) + ((ulong)h2 * r2) + ((ulong)h3 * r1) +
-           ((ulong)h4 * r0);
+      d1 = ((ulong)h0 * polyr1) + ((ulong)h1 * polyr0) + ((ulong)h2 * s4) +
+           ((ulong)h3 * s3) + ((ulong)h4 * s2);
+      d2 = ((ulong)h0 * polyr2) + ((ulong)h1 * polyr1) + ((ulong)h2 * polyr0) +
+           ((ulong)h3 * s4) + ((ulong)h4 * s3);
+      d3 = ((ulong)h0 * polyr3) + ((ulong)h1 * polyr2) + ((ulong)h2 * polyr1) +
+           ((ulong)h3 * polyr0) + ((ulong)h4 * s4);
+      d4 = ((ulong)h0 * polyr4) + ((ulong)h1 * polyr3) + ((ulong)h2 * polyr2) +
+           ((ulong)h3 * polyr1) + ((ulong)h4 * polyr0);
 
       c = (uint)(d0 >> 26);
       h0 = (uint)d0 & 0x3ffffff;
@@ -517,13 +506,13 @@ namespace NMaier.BlockStream
       h2 = ((h2 >> 12) | (h3 << 14)) & 0xffffffff;
       h3 = ((h3 >> 18) | (h4 << 8)) & 0xffffffff;
 
-      var f = (ulong)h0 + pad0;
+      var f = (ulong)h0 + polys0;
       h0 = (uint)f;
-      f = (ulong)h1 + pad1 + (f >> 32);
+      f = (ulong)h1 + polys1 + (f >> 32);
       h1 = (uint)f;
-      f = (ulong)h2 + pad2 + (f >> 32);
+      f = (ulong)h2 + polys2 + (f >> 32);
       h2 = (uint)f;
-      f = (ulong)h3 + pad3 + (f >> 32);
+      f = (ulong)h3 + polys3 + (f >> 32);
       h3 = (uint)f;
 
       var umac = MemoryMarshal.Cast<byte, uint>(tag);

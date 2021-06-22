@@ -19,8 +19,7 @@ namespace NMaier.BlockStream
       ulong initialValue = ulong.MaxValue, ulong finalXor = ulong.MaxValue)
     {
       var table = utable.AsSpan();
-      for (int i = 0, e = data.Length; i < e; i++) {
-        var t = data[i];
+      foreach (var t in data) {
         initialValue = (initialValue >> 8) ^ table[(byte)initialValue ^ t];
       }
 

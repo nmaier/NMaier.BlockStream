@@ -30,10 +30,8 @@ namespace NMaier.BlockStream
     /// <inheritdoc />
     public ReadOnlySpan<byte> TransformBlock(ReadOnlySpan<byte> block)
     {
-      // ReSharper disable once ForCanBeConvertedToForeach
       // ReSharper disable once LoopCanBeConvertedToQuery
-      for (var i = 0; i < transformers.Length; i++) {
-        var t = transformers[i];
+      foreach (var t in transformers) {
         block = t.TransformBlock(block);
       }
 
