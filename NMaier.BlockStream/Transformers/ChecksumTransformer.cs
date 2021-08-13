@@ -4,7 +4,9 @@ using System.Runtime.CompilerServices;
 
 using JetBrains.Annotations;
 
-namespace NMaier.BlockStream
+using NMaier.BlockStream.Internal;
+
+namespace NMaier.BlockStream.Transformers
 {
   /// <summary>
   ///   Transforms data, adding a simple checksum for some integrity checking

@@ -3,6 +3,8 @@ using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
 
+using NMaier.BlockStream.Internal;
+
 namespace NMaier.BlockStream
 {
   internal sealed class BlockReadOnlyCursor : ReaderEnhancedStream

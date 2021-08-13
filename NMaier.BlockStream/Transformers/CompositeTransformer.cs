@@ -3,7 +3,7 @@ using System.Linq;
 
 using JetBrains.Annotations;
 
-namespace NMaier.BlockStream
+namespace NMaier.BlockStream.Transformers
 {
   /// <summary>
   ///   Transforms a data using a composite of different transformers

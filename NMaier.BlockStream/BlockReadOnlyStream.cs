@@ -7,6 +7,9 @@ using System.Runtime.CompilerServices;
 
 using JetBrains.Annotations;
 
+using NMaier.BlockStream.Internal;
+using NMaier.BlockStream.Transformers;
+
 namespace NMaier.BlockStream
 {
   /// <summary>

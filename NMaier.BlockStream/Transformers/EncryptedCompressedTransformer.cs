@@ -3,7 +3,7 @@ using System.Text;
 
 using JetBrains.Annotations;
 
-namespace NMaier.BlockStream
+namespace NMaier.BlockStream.Transformers
 {
   /// <summary>
   ///   Encrypts (using <see cref="ChaChaAndPolyTransformer" /> and compresses (using <see cref="LZ4CompressorTransformer" />

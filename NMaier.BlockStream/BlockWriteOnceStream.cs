@@ -1,8 +1,10 @@
 ﻿using System;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 
 using JetBrains.Annotations;
+
+using NMaier.BlockStream.Internal;
+using NMaier.BlockStream.Transformers;
 
 namespace NMaier.BlockStream
 {

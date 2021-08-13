@@ -5,7 +5,9 @@ using System.Text;
 
 using JetBrains.Annotations;
 
-namespace NMaier.BlockStream
+using NMaier.BlockStream.Internal;
+
+namespace NMaier.BlockStream.Transformers
 {
   /// <summary>
   ///   Transforms data using AES-CTR and verifies data using a HMAC-SHA256.
@@ -74,18 +76,17 @@ namespace NMaier.BlockStream
 
     private sealed class AesCounterMode : SymmetricAlgorithm
     {
-      private readonly AesManaged aes;
+      private readonly Aes aes;
       private readonly byte[] counter;
 
       public AesCounterMode(byte[]? counter = null)
       {
         this.counter = counter ?? new byte[16];
-        aes = new AesManaged {
-          BlockSize = 128,
-          Mode = CipherMode.ECB,
-          Padding = PaddingMode.None,
-          KeySize = 192
-        };
+        aes = Aes.Create();
+        aes.BlockSize = 128;
+        aes.Mode = CipherMode.ECB;
+        aes.Padding = PaddingMode.None;
+        aes.KeySize = 192;
       }
 
       public override ICryptoTransform CreateDecryptor(byte[] rgbKey, byte[]? _)
@@ -114,9 +115,9 @@ namespace NMaier.BlockStream
       private static readonly byte[] rgbIV = new byte[16];
       private readonly byte[] counter;
       private readonly ICryptoTransform counterEncryptor;
+      private readonly int counterLength;
       private readonly byte[] maskBuffer;
       private int maskAvail;
-      private readonly int counterLength;
 
       public CounterModeCryptoTransform(SymmetricAlgorithm symmetricAlgorithm, byte[] key,
         byte[] counter)

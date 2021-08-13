@@ -3,10 +3,9 @@ using System.IO;
 using System.Runtime.CompilerServices;
 #if !NETFRAMEWORK
 using System.Diagnostics.CodeAnalysis;
-
 #endif
 
-namespace NMaier.BlockStream
+namespace NMaier.BlockStream.Internal
 {
   internal static class ThrowHelpers
   {

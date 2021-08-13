@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 
 using JetBrains.Annotations;
 
+using NMaier.BlockStream.Internal;
 #if NETFRAMEWORK
 using System.Buffers;
 

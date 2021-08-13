@@ -8,6 +8,8 @@ using JetBrains.Annotations;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
+using NMaier.BlockStream.Transformers;
+
 namespace NMaier.BlockStream.Tests
 {
   [TestClass]
@@ -685,7 +687,7 @@ namespace NMaier.BlockStream.Tests
 
       public override long Length => 0;
 
-      public override long Position { get; set; } = 0;
+      public override long Position { get; set; }
 
       public override void Flush()
       {

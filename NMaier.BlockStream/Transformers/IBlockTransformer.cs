@@ -2,7 +2,7 @@
 
 using JetBrains.Annotations;
 
-namespace NMaier.BlockStream
+namespace NMaier.BlockStream.Transformers
 {
   /// <summary>
   ///   Transforms data

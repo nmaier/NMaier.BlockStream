@@ -4,6 +4,9 @@ using System.Runtime.CompilerServices;
 
 using JetBrains.Annotations;
 
+using NMaier.BlockStream.Internal;
+using NMaier.BlockStream.Transformers;
+
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace NMaier.BlockStream

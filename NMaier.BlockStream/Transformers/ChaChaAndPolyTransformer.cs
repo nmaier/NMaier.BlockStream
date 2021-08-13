@@ -7,7 +7,9 @@ using System.Text;
 
 using JetBrains.Annotations;
 
-namespace NMaier.BlockStream
+using NMaier.BlockStream.Internal;
+
+namespace NMaier.BlockStream.Transformers
 {
   /// <summary>
   ///   Transforms data using ChaCha20 and verifies data using a Poly1305 MAC.
@@ -37,7 +39,7 @@ namespace NMaier.BlockStream
     private readonly uint cstate11;
 
     private readonly RandomNumberGenerator
-      nonceGenerator = new RNGCryptoServiceProvider();
+      nonceGenerator = RandomNumberGenerator.Create();
 
     private readonly uint polyr0;
     private readonly uint polyr1;

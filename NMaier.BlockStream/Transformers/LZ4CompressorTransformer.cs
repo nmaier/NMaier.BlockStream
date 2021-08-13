@@ -4,7 +4,9 @@ using JetBrains.Annotations;
 
 using K4os.Compression.LZ4;
 
-namespace NMaier.BlockStream
+using NMaier.BlockStream.Internal;
+
+namespace NMaier.BlockStream.Transformers
 {
   /// <summary>
   ///   Transforms data, compressing it with the fast LZ4 compression algorithms
