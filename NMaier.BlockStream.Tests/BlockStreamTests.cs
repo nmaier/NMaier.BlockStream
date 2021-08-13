@@ -388,6 +388,38 @@ namespace NMaier.BlockStream.Tests
     }
 
     [TestMethod]
+    public void BlockRandomAccessStreamTest()
+    {
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new BlockRandomAccessStream(new FakeStream(false, false, false)));
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new BlockRandomAccessStream(new FakeStream(false, true, false)));
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new BlockRandomAccessStream(new FakeStream(true, true, false)));
+    }
+    
+    [TestMethod]
+    public void SequentialBlockWriteOnceStream()
+    {
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new SequentialBlockWriteOnceStream(new FakeStream(false, false, false)));
+    }
+    
+    [TestMethod]
+    public void SequentialBlockReadOnlyStream()
+    {
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new SequentialBlockReadOnlyStream(new FakeStream(false, false, false)));
+    }
+    
+    [TestMethod]
+    public void BlockWriteOnceStream()
+    {
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new BlockWriteOnceStream(new FakeStream(false, false, false)));
+    }
+
+    [TestMethod]
     public void BlockStreamWriterAESTest()
     {
       BlockStreamWriterSizeTestInternal(new AESAndMACTransformer("test"));
@@ -438,7 +470,7 @@ namespace NMaier.BlockStream.Tests
     {
       BlockStreamWriterSizeTestInternal(new EncryptedCompressedTransformer("test222"));
     }
-
+    
     [TestMethod]
     public void BlockStreamWriterFileTests()
     {
@@ -633,6 +665,51 @@ namespace NMaier.BlockStream.Tests
       public void Dispose()
       {
         items.Clear();
+      }
+    }
+
+    private sealed class FakeStream : Stream
+    {
+      public FakeStream(bool canRead, bool canSeek, bool canWrite)
+      {
+        CanRead = canRead;
+        CanSeek = canSeek;
+        CanWrite = canWrite;
+      }
+
+      public override bool CanRead { get; }
+
+      public override bool CanSeek { get; }
+
+      public override bool CanWrite { get; }
+
+      public override long Length => 0;
+
+      public override long Position { get; set; } = 0;
+
+      public override void Flush()
+      {
+        throw new NotImplementedException();
+      }
+
+      public override int Read(byte[] buffer, int offset, int count)
+      {
+        throw new NotImplementedException();
+      }
+
+      public override long Seek(long offset, SeekOrigin origin)
+      {
+        throw new NotImplementedException();
+      }
+
+      public override void SetLength(long value)
+      {
+        throw new NotImplementedException();
+      }
+
+      public override void Write(byte[] buffer, int offset, int count)
+      {
+        throw new NotImplementedException();
       }
     }
 

@@ -12,7 +12,7 @@ namespace NMaier.BlockStream
   {
     [DoesNotReturn]
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ThrowInvalidBlock()
+    internal static void ThrowInvalidBlock()
     {
       throw new IOException("Invalid block");
     }

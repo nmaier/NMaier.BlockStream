@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 
 using JetBrains.Annotations;
@@ -49,6 +50,10 @@ namespace NMaier.BlockStream
       leaveOpen,
       blockSize)
     {
+      if (!wrappedStream.CanWrite) {
+        throw new ArgumentException("Streams must be writable", nameof(wrappedStream));
+      }
+
       currentBlock = new byte[BlockSize];
       _ = WrappedStream.Seek(0, SeekOrigin.Begin);
       wrappedStream.SetLength(0);

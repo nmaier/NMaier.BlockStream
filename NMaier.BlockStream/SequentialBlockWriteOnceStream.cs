@@ -22,6 +22,24 @@ namespace NMaier.BlockStream
 
     /// <summary>
     ///   Wraps a generic stream into a sequential writer block stream. These streams are not seekable.
+    ///   The data can be later consumed by a <see cref="SequentialBlockReadOnlyStream" />.
+    /// </summary>
+    /// <remarks>Uses a <see cref="NoneBlockTransformer" /></remarks>
+    /// <param name="wrappedStream">Stream to wrap</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
+    /// <param name="blockSize">Block size to use</param>
+    public SequentialBlockWriteOnceStream(Stream wrappedStream, bool leaveOpen = false,
+      short blockSize = BLOCK_SIZE) : this(
+      wrappedStream,
+      new NoneBlockTransformer(),
+      leaveOpen,
+      blockSize)
+    {
+    }
+
+    /// <summary>
+    ///   Wraps a generic stream into a sequential writer block stream. These streams are not seekable.
+    ///   The data can be later consumed by a <see cref="SequentialBlockReadOnlyStream" />.
     /// </summary>
     /// <param name="wrappedStream">Stream to wrap</param>
     /// <param name="transformer">Block transformer to use</param>
@@ -35,6 +53,9 @@ namespace NMaier.BlockStream
       leaveOpen,
       blockSize)
     {
+      if (!wrappedStream.CanWrite) {
+        throw new ArgumentException("Streams must be writable", nameof(wrappedStream));
+      }
     }
 
     public override bool CanRead => false;

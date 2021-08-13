@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
 using JetBrains.Annotations;
+
 #if NETFRAMEWORK
 using System.Buffers;
 
@@ -67,8 +69,7 @@ namespace NMaier.BlockStream
     {
 #if NETFRAMEWORK
       while (length > 0) {
-        var read
- = stream.Read(buffer, offset, length);
+        var read = stream.Read(buffer, offset, length);
         if (read == length) {
           break;
         }
@@ -77,10 +78,8 @@ namespace NMaier.BlockStream
           ThrowHelpers.ThrowTruncatedRead();
         }
 
-        length
- -= read;
-        offset
- += read;
+        length -= read;
+        offset += read;
       }
 #else
       ReadFullBlock(stream, buffer.AsSpan(offset, length), length);
@@ -134,7 +133,10 @@ namespace NMaier.BlockStream
 #endif
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5379:Ensure Key Derivation Function algorithm is sufficiently strong", Justification = "<Pending>")]
+    [SuppressMessage(
+      "Security",
+      "CA5379:Ensure Key Derivation Function algorithm is sufficiently strong",
+      Justification = "<Pending>")]
     internal static byte[] DeriveKeyBytesReasonablySafeNotForStorage(
       this byte[] passphrase, int length)
     {

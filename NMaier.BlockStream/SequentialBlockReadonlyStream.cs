@@ -21,6 +21,31 @@ namespace NMaier.BlockStream
     private short pos;
 
 
+    /// <summary>
+    ///   Wraps a generic stream into a sequential reader block stream. These streams are not seekable.
+    ///   The data must have been produced by a <see cref="SequentialBlockWriteOnceStream" />.
+    /// </summary>
+    /// <remarks>Uses a <see cref="NoneBlockTransformer" /></remarks>
+    /// <param name="wrappedStream">Stream to wrap</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
+    /// <param name="blockSize">Block size to use</param>
+    public SequentialBlockReadOnlyStream(Stream wrappedStream, bool leaveOpen = false,
+      short blockSize = BLOCK_SIZE) : this(
+      wrappedStream,
+      new NoneBlockTransformer(),
+      leaveOpen,
+      blockSize)
+    {
+    }
+
+    /// <summary>
+    ///   Wraps a generic stream into a sequential reader block stream. These streams are not seekable.
+    ///   The data must have been produced by a <see cref="SequentialBlockWriteOnceStream" />.
+    /// </summary>
+    /// <param name="wrappedStream">Stream to wrap</param>
+    /// <param name="transformer">Block transformer to use</param>
+    /// <param name="leaveOpen">Leave the wrapped stream open when disposing this block stream</param>
+    /// <param name="blockSize">Block size to use</param>
     public SequentialBlockReadOnlyStream(Stream wrappedStream,
       IBlockTransformer transformer, bool leaveOpen = false, short blockSize = BLOCK_SIZE)
       : base(wrappedStream, transformer, leaveOpen, blockSize)
