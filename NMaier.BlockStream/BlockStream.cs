@@ -18,13 +18,13 @@ namespace NMaier.BlockStream
     protected internal readonly short BlockSize;
     protected readonly IBlockCache? Cache;
     protected readonly Dictionary<long, Extent> Extents = new();
+    protected readonly long Start;
     protected readonly IBlockTransformer Transformer;
     protected readonly Stream WrappedStream;
     protected long CurrentFooterLength;
     protected long CurrentLength;
     protected long CurrentPosition;
     private readonly bool leaveOpen;
-    protected readonly long Start;
 
     protected BlockStream(Stream wrappedStream, IBlockTransformer transformer,
       bool leaveOpen, short blockSize = BLOCK_SIZE, IBlockCache? cache = null)

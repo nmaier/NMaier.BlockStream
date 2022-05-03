@@ -100,7 +100,7 @@ namespace NMaier.BlockStream.Tests
 
       using var ms2 = new MemoryStream();
       using (var writer =
-        new SequentialBlockWriteOnceStream(ms2, transformer, leaveOpen: true)) {
+             new SequentialBlockWriteOnceStream(ms2, transformer, leaveOpen: true)) {
         writer.Write(
           new byte[] {
             0x1,
@@ -110,7 +110,7 @@ namespace NMaier.BlockStream.Tests
 
       ms2.Seek(0, SeekOrigin.Begin);
       using (var reader =
-        new SequentialBlockReadOnlyStream(ms2, transformer, leaveOpen: true)) {
+             new SequentialBlockReadOnlyStream(ms2, transformer, leaveOpen: true)) {
         Span<byte> actual = stackalloc byte[2];
         reader.ReadFullBlock(actual);
         Assert.IsTrue(
@@ -159,10 +159,10 @@ namespace NMaier.BlockStream.Tests
       }
 
       using (var reader = new BlockReadOnlyStream(
-        ms,
-        transformer,
-        blockSize: 512,
-        cache: cache)) {
+               ms,
+               transformer,
+               blockSize: 512,
+               cache: cache)) {
         Assert.AreEqual(expectedLength, reader.Length);
         Assert.IsTrue(reader.CanRead);
         Assert.IsTrue(reader.CanSeek);
@@ -200,7 +200,8 @@ namespace NMaier.BlockStream.Tests
         _ = Assert.ThrowsException<NotSupportedException>(
           () => reader.Write(new byte[1], 0, 1));
 #else
-      _ = Assert.ThrowsException<NotSupportedException>(() => reader.Write(new byte[1]));
+        _ = Assert.ThrowsException<NotSupportedException>(
+          () => reader.Write(new byte[1]));
 #endif
         // ReSharper restore AccessToDisposedClosure
 
@@ -226,10 +227,10 @@ namespace NMaier.BlockStream.Tests
 
       using var ms2 = new MemoryStream();
       using (var writer2 = new BlockWriteOnceStream(
-        ms2,
-        transformer,
-        leaveOpen: true,
-        blockSize: 512)) {
+               ms2,
+               transformer,
+               leaveOpen: true,
+               blockSize: 512)) {
         writer2.Write(
           new byte[] {
             0x1,
@@ -239,10 +240,10 @@ namespace NMaier.BlockStream.Tests
 
       ms2.Seek(0, SeekOrigin.Begin);
       using (var reader2 = new BlockReadOnlyStream(
-        ms2,
-        transformer,
-        leaveOpen: true,
-        blockSize: 512)) {
+               ms2,
+               transformer,
+               leaveOpen: true,
+               blockSize: 512)) {
         Span<byte> actual = stackalloc byte[2];
         reader2.ReadFullBlock(actual);
         Assert.IsTrue(
@@ -384,10 +385,10 @@ namespace NMaier.BlockStream.Tests
 
       using var ms2 = new MemoryStream();
       using (var writer2 = new BlockRandomAccessStream(
-        ms2,
-        transformer,
-        leaveOpen: true,
-        blockSize: 512)) {
+               ms2,
+               transformer,
+               leaveOpen: true,
+               blockSize: 512)) {
         writer2.Write(
           new byte[] {
             0x1,
@@ -397,10 +398,10 @@ namespace NMaier.BlockStream.Tests
 
       _ = ms2.Seek(0, SeekOrigin.Begin);
       using (var reader2 = new BlockRandomAccessStream(
-        ms2,
-        transformer,
-        leaveOpen: true,
-        blockSize: 512)) {
+               ms2,
+               transformer,
+               leaveOpen: true,
+               blockSize: 512)) {
         Span<byte> actual = stackalloc byte[2];
         reader2.ReadFullBlock(actual);
         Assert.IsTrue(
@@ -423,27 +424,6 @@ namespace NMaier.BlockStream.Tests
         () => new BlockRandomAccessStream(new FakeStream(false, true, false)));
       _ = Assert.ThrowsException<ArgumentException>(
         () => new BlockRandomAccessStream(new FakeStream(true, true, false)));
-    }
-    
-    [TestMethod]
-    public void SequentialBlockWriteOnceStream()
-    {
-      _ = Assert.ThrowsException<ArgumentException>(
-        () => new SequentialBlockWriteOnceStream(new FakeStream(false, false, false)));
-    }
-    
-    [TestMethod]
-    public void SequentialBlockReadOnlyStream()
-    {
-      _ = Assert.ThrowsException<ArgumentException>(
-        () => new SequentialBlockReadOnlyStream(new FakeStream(false, false, false)));
-    }
-    
-    [TestMethod]
-    public void BlockWriteOnceStream()
-    {
-      _ = Assert.ThrowsException<ArgumentException>(
-        () => new BlockWriteOnceStream(new FakeStream(false, false, false)));
     }
 
     [TestMethod]
@@ -497,7 +477,7 @@ namespace NMaier.BlockStream.Tests
     {
       BlockStreamTestRunner(new EncryptedCompressedTransformer("test222"));
     }
-    
+
     [TestMethod]
     public void BlockStreamWriterFileTests()
     {
@@ -663,6 +643,27 @@ namespace NMaier.BlockStream.Tests
     public void BlockStreamWriterSizeTest()
     {
       BlockStreamTestRunner(new TransformerTests.TestTransformer());
+    }
+
+    [TestMethod]
+    public void BlockWriteOnceStream()
+    {
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new BlockWriteOnceStream(new FakeStream(false, false, false)));
+    }
+
+    [TestMethod]
+    public void SequentialBlockReadOnlyStream()
+    {
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new SequentialBlockReadOnlyStream(new FakeStream(false, false, false)));
+    }
+
+    [TestMethod]
+    public void SequentialBlockWriteOnceStream()
+    {
+      _ = Assert.ThrowsException<ArgumentException>(
+        () => new SequentialBlockWriteOnceStream(new FakeStream(false, false, false)));
     }
 
     private sealed class BlockCache : IBlockCache
