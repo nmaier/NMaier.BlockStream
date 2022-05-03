@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 
 using JetBrains.Annotations;
@@ -121,11 +122,26 @@ namespace NMaier.BlockStream.Tests
       }
     }
 
-    private static void BlockStreamWriterOnceTest(IBlockTransformer transformer,
-      IBlockCache cache)
+
+    private static void BlockStreamTestRunner(IBlockTransformer transformer)
+    {
+      BlockStreamWriterSizeTestRunner(transformer, null);
+      BlockStreamWriterSizeTestRunner(transformer, new BlockCache());
+      BlockStreamSequentialTestRunner(transformer);
+      BlockStreamWriteOnceTestRunner(transformer, null);
+      BlockStreamWriteOnceTestRunner(transformer, new BlockCache());
+    }
+
+    private static void BlockStreamWriteOnceTestRunner(IBlockTransformer transformer,
+      [CanBeNull] IBlockCache cache)
     {
       using var ms = new KeepOpenMemoryStream();
       const int COUNT = 100_000;
+
+      var r = new byte[100];
+      var g = RandomNumberGenerator.Create();
+      g.GetBytes(r);
+      ms.Write(r, 0, r.Length);
 
       long expectedLength;
       using (var writer = new BlockWriteOnceStream(ms, transformer, blockSize: 512)) {
@@ -142,67 +158,71 @@ namespace NMaier.BlockStream.Tests
         expectedLength = writer.Length;
       }
 
-      File.WriteAllBytes("C:\\temp\\blocked.bin", ms.ToArray());
-
-      using var reader = new BlockReadOnlyStream(
+      using (var reader = new BlockReadOnlyStream(
         ms,
         transformer,
         blockSize: 512,
-        cache: cache);
-      Assert.AreEqual(expectedLength, reader.Length);
-      Assert.IsTrue(reader.CanRead);
-      Assert.IsTrue(reader.CanSeek);
-      Assert.IsFalse(reader.CanWrite);
-      Assert.IsFalse(reader.CanTimeout);
-      Assert.AreEqual(reader.Position, 0);
-      _ = reader.Seek(0, SeekOrigin.End);
-      Assert.AreEqual(reader.Position, reader.Length);
-      _ = reader.Seek(-10, SeekOrigin.Current);
-      Assert.AreEqual(reader.Position, reader.Length - 10);
-      reader.Position -= 10;
-      Assert.AreEqual(reader.Position, reader.Length - 20);
-      _ = reader.Seek(0, SeekOrigin.Begin);
-      Assert.AreEqual(reader.Position, 0);
+        cache: cache)) {
+        Assert.AreEqual(expectedLength, reader.Length);
+        Assert.IsTrue(reader.CanRead);
+        Assert.IsTrue(reader.CanSeek);
+        Assert.IsFalse(reader.CanWrite);
+        Assert.IsFalse(reader.CanTimeout);
+        Assert.AreEqual(reader.Position, 0);
+        _ = reader.Seek(0, SeekOrigin.End);
+        Assert.AreEqual(reader.Position, reader.Length);
+        _ = reader.Seek(-10, SeekOrigin.Current);
+        Assert.AreEqual(reader.Position, reader.Length - 10);
+        reader.Position -= 10;
+        Assert.AreEqual(reader.Position, reader.Length - 20);
+        _ = reader.Seek(0, SeekOrigin.Begin);
+        Assert.AreEqual(reader.Position, 0);
 
 
-      Assert.AreEqual(reader.Seek(0, SeekOrigin.End), reader.Length);
-      Assert.AreEqual(reader.Seek(-10, SeekOrigin.Current), reader.Length - 10);
-      Assert.AreEqual(reader.Seek(0, SeekOrigin.Begin), 0);
+        Assert.AreEqual(reader.Seek(0, SeekOrigin.End), reader.Length);
+        Assert.AreEqual(reader.Seek(-10, SeekOrigin.Current), reader.Length - 10);
+        Assert.AreEqual(reader.Seek(0, SeekOrigin.Begin), 0);
 
-      // ReSharper disable AccessToDisposedClosure
-      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
-        () => reader.Seek(-10, SeekOrigin.Begin));
-      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
-        () => reader.Seek(-10, SeekOrigin.Current));
-      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
-        () => reader.Seek(-reader.Length - 10, SeekOrigin.End));
-      _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
-        () => reader.Seek(0, (SeekOrigin)(-1)));
-      // ReSharper restore AccessToDisposedClosure
+        // ReSharper disable AccessToDisposedClosure
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => reader.Seek(-10, SeekOrigin.Begin));
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => reader.Seek(-10, SeekOrigin.Current));
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => reader.Seek(-reader.Length - 10, SeekOrigin.End));
+        _ = Assert.ThrowsException<ArgumentOutOfRangeException>(
+          () => reader.Seek(0, (SeekOrigin)(-1)));
+        // ReSharper restore AccessToDisposedClosure
 
-      // ReSharper disable AccessToDisposedClosure
-      _ = Assert.ThrowsException<NotSupportedException>(() => reader.SetLength(0));
+        // ReSharper disable AccessToDisposedClosure
+        _ = Assert.ThrowsException<NotSupportedException>(() => reader.SetLength(0));
 #if NETFRAMEWORK
-      _ =
- Assert.ThrowsException<NotSupportedException>(() => reader.Write(new byte[1], 0, 1));
+        _ = Assert.ThrowsException<NotSupportedException>(
+          () => reader.Write(new byte[1], 0, 1));
 #else
       _ = Assert.ThrowsException<NotSupportedException>(() => reader.Write(new byte[1]));
 #endif
-      // ReSharper restore AccessToDisposedClosure
+        // ReSharper restore AccessToDisposedClosure
 
-      using var binaryReader = new BinaryReader(reader, Encoding.ASCII, true);
-      using var binaryCursorReader = new BinaryReader(
-        reader.CreateCursor(),
-        Encoding.ASCII,
-        true);
-      for (var i = 0; i < COUNT; ++i) {
-        Assert.AreEqual(i, binaryReader.ReadInt32());
-        Assert.AreEqual(i, binaryCursorReader.ReadInt32());
+        using var binaryReader = new BinaryReader(reader, Encoding.ASCII, true);
+        using var binaryCursorReader = new BinaryReader(
+          reader.CreateCursor(),
+          Encoding.ASCII,
+          true);
+        for (var i = 0; i < COUNT; ++i) {
+          Assert.AreEqual(i, binaryReader.ReadInt32());
+          Assert.AreEqual(i, binaryCursorReader.ReadInt32());
+        }
+
+        var buf = new byte[1 << 22];
+        Assert.AreEqual(buf.Length, reader.Read(buf));
+        Assert.IsTrue(buf.All(i => i == 0));
       }
 
-      var buf = new byte[1 << 22];
-      Assert.AreEqual(buf.Length, reader.Read(buf));
-      Assert.IsTrue(buf.All(i => i == 0));
+      _ = ms.Seek(0, SeekOrigin.Begin);
+      var r2 = new byte[r.Length];
+      ms.ReadFullBlock(r2);
+      Assert.IsTrue(r.AsSpan().SequenceEqual(r2));
 
       using var ms2 = new MemoryStream();
       using (var writer2 = new BlockWriteOnceStream(
@@ -236,21 +256,17 @@ namespace NMaier.BlockStream.Tests
       Assert.AreNotEqual(0, ms2.Position);
     }
 
-
-    private static void BlockStreamWriterSizeTestInternal(IBlockTransformer transformer)
-    {
-      BlockStreamWriterSizeTestRunner(transformer, null);
-      BlockStreamWriterSizeTestRunner(transformer, new BlockCache());
-      BlockStreamSequentialTestRunner(transformer);
-    }
-
     private static void BlockStreamWriterSizeTestRunner(IBlockTransformer transformer,
       [CanBeNull] IBlockCache cache)
     {
-      BlockStreamWriterOnceTest(transformer, cache);
+      const int ITEMS = 10_000;
 
       using var ms = new KeepOpenMemoryStream();
-      const int ITEMS = 10_000;
+      var r = new byte[100];
+      var g = RandomNumberGenerator.Create();
+      g.GetBytes(r);
+      ms.Write(r, 0, r.Length);
+
       using (var writer = new BlockRandomAccessStream(ms, transformer, cache: cache)) {
         Assert.IsTrue(writer.CanRead);
         Assert.IsTrue(writer.CanSeek);
@@ -276,6 +292,11 @@ namespace NMaier.BlockStream.Tests
           Assert.AreEqual(i, binaryReader.ReadInt32());
         }
       }
+
+      _ = ms.Seek(0, SeekOrigin.Begin);
+      var r2 = new byte[r.Length];
+      ms.ReadFullBlock(r2);
+      Assert.IsTrue(r.AsSpan().SequenceEqual(r2));
 
       using (var writer = new BlockRandomAccessStream(ms, transformer, cache: cache)) {
         Assert.AreEqual(writer.Position, 0);
@@ -357,6 +378,10 @@ namespace NMaier.BlockStream.Tests
         writer.Flush(true);
       }
 
+      _ = ms.Seek(0, SeekOrigin.Begin);
+      ms.ReadFullBlock(r2);
+      Assert.IsTrue(r.AsSpan().SequenceEqual(r2));
+
       using var ms2 = new MemoryStream();
       using (var writer2 = new BlockRandomAccessStream(
         ms2,
@@ -424,25 +449,25 @@ namespace NMaier.BlockStream.Tests
     [TestMethod]
     public void BlockStreamWriterAESTest()
     {
-      BlockStreamWriterSizeTestInternal(new AESAndMACTransformer("test"));
+      BlockStreamTestRunner(new AESAndMACTransformer("test"));
     }
 
     [TestMethod]
     public void BlockStreamWriterChaTest()
     {
-      BlockStreamWriterSizeTestInternal(new ChaChaAndPolyTransformer("test2"));
+      BlockStreamTestRunner(new ChaChaAndPolyTransformer("test2"));
     }
 
     [TestMethod]
     public void BlockStreamWriterChecksumTest()
     {
-      BlockStreamWriterSizeTestInternal(new ChecksumTransformer());
+      BlockStreamTestRunner(new ChecksumTransformer());
     }
 
     [TestMethod]
     public void BlockStreamWriterComp2Test()
     {
-      BlockStreamWriterSizeTestInternal(
+      BlockStreamTestRunner(
         new CompositeTransformer(
           new TransformerTests.TestTransformer(),
           new NoneBlockTransformer()));
@@ -451,7 +476,7 @@ namespace NMaier.BlockStream.Tests
     [TestMethod]
     public void BlockStreamWriterCompLZ4ChaTest()
     {
-      BlockStreamWriterSizeTestInternal(
+      BlockStreamTestRunner(
         new CompositeTransformer(
           new LZ4CompressorTransformer(),
           new ChaChaAndPolyTransformer("test4"),
@@ -461,7 +486,7 @@ namespace NMaier.BlockStream.Tests
     [TestMethod]
     public void BlockStreamWriterCompTest()
     {
-      BlockStreamWriterSizeTestInternal(
+      BlockStreamTestRunner(
         new CompositeTransformer(
           new NoneBlockTransformer(),
           new TransformerTests.TestTransformer()));
@@ -470,7 +495,7 @@ namespace NMaier.BlockStream.Tests
     [TestMethod]
     public void BlockStreamWriterEncCompTest()
     {
-      BlockStreamWriterSizeTestInternal(new EncryptedCompressedTransformer("test222"));
+      BlockStreamTestRunner(new EncryptedCompressedTransformer("test222"));
     }
     
     [TestMethod]
@@ -561,7 +586,7 @@ namespace NMaier.BlockStream.Tests
     [TestMethod]
     public void BlockStreamWriterLZ4Test()
     {
-      BlockStreamWriterSizeTestInternal(new LZ4CompressorTransformer());
+      BlockStreamTestRunner(new LZ4CompressorTransformer());
     }
 
     [TestMethod]
@@ -631,13 +656,13 @@ namespace NMaier.BlockStream.Tests
     [TestMethod]
     public void BlockStreamWriterNoneTest()
     {
-      BlockStreamWriterSizeTestInternal(new NoneBlockTransformer());
+      BlockStreamTestRunner(new NoneBlockTransformer());
     }
 
     [TestMethod]
     public void BlockStreamWriterSizeTest()
     {
-      BlockStreamWriterSizeTestInternal(new TransformerTests.TestTransformer());
+      BlockStreamTestRunner(new TransformerTests.TestTransformer());
     }
 
     private sealed class BlockCache : IBlockCache

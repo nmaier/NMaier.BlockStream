@@ -173,7 +173,7 @@ namespace NMaier.BlockStream
         }
         case -1: {
           var newindex = Extents.Count;
-          var last = newindex > 0 ? Extents[newindex - 1] : new Extent(0, 0);
+          var last = newindex > 0 ? Extents[newindex - 1] : new Extent(Start, 0);
           var transformed = Transformer.TransformBlock(currentBlock.AsSpan(0, BlockSize));
           if (transformed.Length > short.MaxValue) {
             ThrowHelpers.ThrowBlockTooLarge();
@@ -460,7 +460,7 @@ namespace NMaier.BlockStream
 
     private void ReadIndex()
     {
-      if (WrappedStream.Length == 0) {
+      if (WrappedStream.Length == Start) {
         WriteFooter();
         MakeClean(false);
         return;

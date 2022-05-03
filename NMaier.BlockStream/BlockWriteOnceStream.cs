@@ -57,8 +57,7 @@ namespace NMaier.BlockStream
       }
 
       currentBlock = new byte[BlockSize];
-      _ = WrappedStream.Seek(0, SeekOrigin.Begin);
-      wrappedStream.SetLength(0);
+      wrappedStream.SetLength(wrappedStream.Position);
     }
 
     public override bool CanRead => false;

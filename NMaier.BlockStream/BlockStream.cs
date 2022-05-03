@@ -24,6 +24,7 @@ namespace NMaier.BlockStream
     protected long CurrentLength;
     protected long CurrentPosition;
     private readonly bool leaveOpen;
+    protected readonly long Start;
 
     protected BlockStream(Stream wrappedStream, IBlockTransformer transformer,
       bool leaveOpen, short blockSize = BLOCK_SIZE, IBlockCache? cache = null)
@@ -36,6 +37,7 @@ namespace NMaier.BlockStream
       }
 
       WrappedStream = wrappedStream;
+      Start = wrappedStream.Position;
       Transformer = transformer;
       this.leaveOpen = leaveOpen;
       BlockSize = blockSize;
@@ -57,7 +59,7 @@ namespace NMaier.BlockStream
 
     protected void WriteFooter()
     {
-      var totalLength = 0L;
+      var totalLength = Start;
       using var ms = new MemoryStream();
       using (var writer = new BinaryWriter(ms, Encoding.ASCII, true)) {
         foreach (var extent in Extents.Values) {
