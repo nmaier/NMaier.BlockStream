@@ -470,6 +470,10 @@ namespace NMaier.BlockStream
       Span<byte> blen = stackalloc byte[sizeof(long) * 2];
       WrappedStream.ReadFullBlock(blen);
       var footerLength = ReadInt64LittleEndian(blen);
+      if (footerLength < 0) {
+        throw new IOException("Block stream has corrupt footer");
+      }
+
       CurrentFooterLength =
         CurrentLength = ReadInt64LittleEndian(blen.Slice(sizeof(long)));
       _ = WrappedStream.Seek(-(sizeof(long) * 2) - footerLength, SeekOrigin.End);
