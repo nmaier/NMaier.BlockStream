@@ -2,10 +2,10 @@
 
 using JetBrains.Annotations;
 
-namespace NMaier.BlockStream.Internal
-{
-  [PublicAPI]
-  [DebuggerDisplay("Ext: {Offset} {Length}")]
+namespace NMaier.BlockStream.Internal;
+
+[PublicAPI]
+[DebuggerDisplay("Ext: {Offset} {Length}")]
 #if NETFRAMEWORK || NETSTANDARD
   public readonly struct Extent
   {
@@ -19,6 +19,5 @@ namespace NMaier.BlockStream.Internal
     }
   }
 #else
-  public sealed record Extent(long Offset, short Length);
+public sealed record Extent(long Offset, short Length);
 #endif
-}

@@ -211,3 +211,6 @@ dotnet_diagnostic.CA2201.severity = none
 
 # Default severity for analyzer diagnostics with category 'Naming'
 dotnet_analyzer_diagnostic.category-Naming.severity = none
+
+# IDE0160: Convert to block scoped namespace
+csharp_style_namespace_declarations = file_scoped

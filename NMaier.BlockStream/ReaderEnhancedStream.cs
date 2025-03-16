@@ -1,13 +1,12 @@
 ﻿using System.IO;
 #if NETFRAMEWORK
 using System;
-
 #endif
 
-namespace NMaier.BlockStream
+namespace NMaier.BlockStream;
+
+public abstract class ReaderEnhancedStream : Stream
 {
-  public abstract class ReaderEnhancedStream : Stream
-  {
 #if NETFRAMEWORK
     /// <summary>
     ///   See <see cref="Stream.Read" />
@@ -16,5 +15,4 @@ namespace NMaier.BlockStream
     /// <returns>Number of bytes read</returns>
     public abstract int Read(Span<byte> buffer);
 #endif
-  }
 }
